@@ -59,7 +59,7 @@ static CGColorSpaceRef srgbSpace;
 static NSString *outDir;
 static int recoloredImages = 0;
 static uintptr_t regionDrawStart, regionDrawEnd;
-static ImageRange panKnobDraw, arrangeKnobDraw, trackHeaderDraw;
+static ImageRange panKnobDraw, arrangeKnobDraw, trackHeaderDraw, textDraw, rulerMarkerDraw;
 static CGColorRef (*fillColorOf)(CGContextRef);
 
 /**
@@ -786,10 +786,59 @@ static void interposeFillColor(CGContextRef ctx, CGColorRef color) {
    CGContextSetFillColorWithColor(ctx, color);
 }
 
+/**
+ * Draws a line of text, and maps the gray of the marker names in the ruler. Logic gives these
+ * names a fixed white, so no color hook sees it. The text becomes a clip, and a fill in the
+ * mapped gray paints the glyphs.
+ *
+ * @param line CTLineRef - the line of text
+ * @param ctx CGContextRef - the drawing context
+ */
+static void interposeLineDraw(CTLineRef line, CGContextRef ctx) {
+   uintptr_t caller = (uintptr_t)__builtin_return_address(0) & ADDRESS_MASK;
+   CFArrayRef runs = NULL;
+   CGColorRef text = NULL, rgb = NULL;
+   const CGFloat *c = NULL;
+
+   if (caller >= textDraw.start && caller < textDraw.end && isCalledFrom(rulerMarkerDraw, (ImageRange){ 0, 0 })) {
+      runs = CTLineGetGlyphRuns(line);
+   }
+   if (runs && CFArrayGetCount(runs) > 0) {
+      text = (CGColorRef)CFDictionaryGetValue(CTRunGetAttributes(CFArrayGetValueAtIndex(runs, 0)), kCTForegroundColorAttributeName);
+   }
+   if (text) {
+      rgb = CGColorCreateCopyByMatchingToColorSpace(srgbSpace, kCGRenderingIntentDefault, text, NULL);
+      c = rgb && CGColorGetNumberOfComponents(rgb) == 4 ? CGColorGetComponents(rgb) : NULL;
+   }
+   if (c && isGrayish(c[0], c[1], c[2])) {
+      CGFloat white = mapGray((c[0] + c[1] + c[2]) / 3, c[3]);
+      CGFloat values[4] = { white, white, white, c[3] };
+      CGColorRef mapped = CGColorCreate(srgbSpace, values);
+      CGPoint end;
+
+      CGContextSaveGState(ctx);
+      CGContextSetTextDrawingMode(ctx, kCGTextClip);
+      CTLineDraw(line, ctx);
+      end = CGContextGetTextPosition(ctx);
+      CGContextSetFillColorWithColor(ctx, mapped);
+      CGContextFillRect(ctx, CGContextGetClipBoundingBox(ctx));
+      CGContextRestoreGState(ctx);
+      CGContextSetTextPosition(ctx, end.x, end.y);
+      CGColorRelease(mapped);
+      CGColorRelease(rgb);
+      return;
+   }
+   if (rgb) {
+      CGColorRelease(rgb);
+   }
+   CTLineDraw(line, ctx);
+}
+
 __attribute__((used, section("__DATA,__interpose"))) static struct { const void *replacement; const void *original; } interposeTable[] = {
    { (const void *)interposeFillColor, (const void *)CGContextSetFillColorWithColor },
    { (const void *)interposeThreePart, (const void *)NSDrawThreePartImage },
    { (const void *)interposeDrawPath, (const void *)CGContextDrawPath },
+   { (const void *)interposeLineDraw, (const void *)CTLineDraw },
 };
 
 static id hookCompositeImage(id manager, SEL sel, id description, id context) {
@@ -1173,6 +1222,8 @@ __attribute__((constructor)) static void start(void) {
    panKnobDraw = functionRange("_ZN19HOTSPOTauknob127Pan5PrintER6U_VARS", "_ZNK19HOTSPOTauknob127Pan7HelpTagER6U_VARS");
    arrangeKnobDraw = functionRange("_ZN26HOTSPOTauknob127PanArrange5PrintER6U_VARS", "_ZNK26HOTSPOTauknob127PanArrange11QuickHelpIDER6U_VARS");
    trackHeaderDraw = functionRange("_Z13DoTrackHeaderR6U_VARS19TPosOneBasedTrackNrxP6CTrackS3_PK16TTrackHeaderDataP5CMSeqPKS2_SA_i", "_Z17DoAllTrackHeadersR6U_VARSP7FENSTERPv");
+   textDraw = functionRange("_ZN2GC8drawTextEddPKtmd", "_ZN2GC8drawTextEddPK10__CFStringd");
+   rulerMarkerDraw = functionRange("_Z12PrintMarkersR6U_VARSP5CSongP7FENSTERxx19TSignedAbsPureClockb", "_Z18ColoredMarkerAchseP5CSongP7FENSTERxxb");
    fillColorOf = dlsym(RTLD_DEFAULT, "CGContextGetFillColorAsColor");
 
    origAppearanceNamed = swapClassMethod([NSAppearance class], @selector(appearanceNamed:), (IMP)hookAppearanceNamed);

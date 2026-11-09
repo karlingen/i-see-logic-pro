@@ -54,7 +54,7 @@ All theme code is in `theme/light-theme.m`. The constructor `start()` installs e
 - Buttons: `hookToolbarImage` and `hookButtonImage` keep glyphs white on active colored fills. In the track header, `repOnBevel` and `interposeFillColor` do this at draw time.
 - Title bar: on macOS 26, system glass draws the title bar, and it is white in `Aqua`. If `surfaceMax` is below 1, `hookOrderWindow` makes each titled window's title bar transparent, so the window background shows through. Editor windows such as the Piano Roll and the Mixer use the system `windowBackgroundColor`, so the hook gives them the mapped `BackgroundViewControlbar` instead.
 - System colors: the theme maps only Logic catalog colors, because system colors do not pass through `-[CUINamedColor cgColor]`. If `surfaceMax` is below 1, `hookClipBackground` replaces the system `controlBackgroundColor` of clip views with a gray at `surfaceMax`. Legacy scroller tracks show this color.
-- Special cases: `interposeDrawPath` recolors region outlines. The `CTooltipView` hooks keep help tag text white. The `CLgNotesTextView` hooks make note text black.
+- Special cases: `interposeDrawPath` recolors region outlines. `interposeLineDraw` maps the marker names in the ruler. `PrintMarkerText` gives them a fixed white, so the hook draws the text as a clip and fills it with the mapped gray. The `CTooltipView` hooks keep help tag text white. The `CLgNotesTextView` hooks make note text black.
 
 Color data comes from `*Mapping.plist` asset sets and `.car` catalogs inside the app bundle. Read them with `plutil` and `assetutil -I`. For a color with an unknown source, interpose a CoreGraphics call (for example `CGContextDrawImage`) and log `+[NSThread callStackSymbols]`. A guess from a color name is often wrong.
 
@@ -62,6 +62,7 @@ Color data comes from `*Mapping.plist` asset sets and `.car` catalogs inside the
 
 - The region outline depends on the symbols `drawRegionInArrangeViewWithFlex` and `drawRegionFrame`, and on three adjacent functions. If a Logic Pro update removes them, the outline stays black.
 - The knob and volume slider styles depend on the symbols `DoTrackHeader` and `HOTSPOTauknob127Pan*::Print`, and on the symbols after them. If a Logic Pro update removes them, those images stay dark.
+- The ruler marker names depend on the symbols `PrintMarkers` and `GC::drawText`, and on the symbols after them. If a Logic Pro update removes them, the names stay white.
 - Do not call `+[NSThread callStackSymbols]` or `dladdr` while Logic Pro draws. A lookup scans the Logic symbol table and stops the interface. Compare return addresses with `isCalledFrom`.
 - The image match limits are tuned. `OVERLAY_ALPHA_MAX` must stay at 25 percent, because a higher value turns the volume thumb dark.
 - Some text does not reach any hook. `sRGBColorWithRed:green:blue:alpha:` bypasses the factory hooks, and SwiftUI `.secondary` text needs a code patch.
