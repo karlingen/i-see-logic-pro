@@ -44,6 +44,7 @@ All theme code is in `theme/light-theme.m`. The constructor `start()` installs e
 - Images: `copyRecoloredImage` changes pixels by `ImageStyle`. Named assets pass through `MAAssetManager` and `assetStyle`. Track header images come from a C++ cache and have no names, so `drawStyle` identifies them by size and call stack, once per image. The results stay in associated objects.
 - Nibs: `hookNibDecode` maps literal cell colors and `hookAppearanceDecode` maps a stored `DarkAqua`. Nib decoding skips the factory hooks and `+appearanceNamed:`.
 - Buttons: `hookToolbarImage` and `hookButtonImage` keep glyphs white on active colored fills. In the track header, `repOnBevel` and `interposeFillColor` do this at draw time.
+- Title bar: on macOS 26, system glass draws the title bar, and it is white in `Aqua`. If `surfaceMax` is below 1, `hookOrderWindow` makes each titled window's title bar transparent, so the window background shows through. Editor windows such as the Piano Roll and the Mixer use the system `windowBackgroundColor`, so the hook gives them the mapped `BackgroundViewControlbar` instead.
 - Special cases: `interposeDrawPath` recolors region outlines. The `CTooltipView` hooks keep help tag text white. The `CLgNotesTextView` hooks make note text black.
 
 Color data comes from `*Mapping.plist` asset sets and `.car` catalogs inside the app bundle. Read them with `plutil` and `assetutil -I`. For a color with an unknown source, interpose a CoreGraphics call (for example `CGContextDrawImage`) and log `+[NSThread callStackSymbols]`. A guess from a color name is often wrong.
@@ -55,5 +56,4 @@ Color data comes from `*Mapping.plist` asset sets and `.car` catalogs inside the
 - Do not call `+[NSThread callStackSymbols]` or `dladdr` while Logic Pro draws. A lookup scans the Logic symbol table and stops the interface. Compare return addresses with `isCalledFrom`.
 - The image match limits are tuned. `OVERLAY_ALPHA_MAX` must stay at 25 percent, because a higher value turns the volume thumb dark.
 - Some text does not reach any hook. `sRGBColorWithRed:green:blue:alpha:` bypasses the factory hooks, and SwiftUI `.secondary` text needs a code patch.
-- On macOS 26, the title bar and the control bar are system glass. In `Aqua` they are white, and `surfaceMax` does not change them.
 - The library loads only because Logic Pro 13 has no hardened runtime. If Apple turns it on, `DYLD_INSERT_LIBRARIES` stops working.

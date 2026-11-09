@@ -142,6 +142,7 @@ static IMP origCGColor, origAppearanceNamed, origAppSetAppearance;
 static IMP origTooltipLabel, origTooltipValue, origTooltipRightValue;
 static IMP origAdjustDarkText, origSetCaretColor, origSetTypingAttributes;
 static IMP origNibDecode, origAppearanceDecode, origHeaderDraw, origToolbarImage, origButtonImage;
+static IMP origOrderWindow;
 static Ivar toolbarOnColor;
 static Class notesTextView;
 
@@ -946,6 +947,19 @@ static void hookButtonImage(NSButtonCell *cell, SEL sel, NSImage *image, NSRect 
    ((void (*)(id, SEL, NSImage *, NSRect, NSView *))origButtonImage)(cell, sel, isActive ? whiteGlyph(image) : image, frame, view);
 }
 
+// The macOS 26 title bar is glass, which is white in Aqua. A transparent title bar shows the
+// window background. The main window uses the mapped BackgroundViewControlbar color, but the
+// editor windows use the system windowBackgroundColor, which the theme does not map.
+static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode place, NSInteger other) {
+   if (place != NSWindowOut && (window.styleMask & NSWindowStyleMaskTitled) && !window.titlebarAppearsTransparent) {
+      window.titlebarAppearsTransparent = YES;
+      if ([window.backgroundColor isEqual:NSColor.windowBackgroundColor]) {
+         window.backgroundColor = [NSColor colorNamed:@"BackgroundViewControlbar"];
+      }
+   }
+   ((void (*)(id, SEL, NSWindowOrderingMode, NSInteger))origOrderWindow)(window, sel, place, other);
+}
+
 static IMP swapClassMethod(Class cls, SEL sel, IMP hook) {
    return method_setImplementation(class_getClassMethod(cls, sel), hook);
 }
@@ -1032,6 +1046,9 @@ __attribute__((constructor)) static void start(void) {
    toolbarOnColor = class_getInstanceVariable(objc_getClass("_TtC5Logic17ToolbarButtonCell"), "onColor");
    origToolbarImage = method_setImplementation(class_getInstanceMethod(objc_getClass("_TtC5Logic17ToolbarButtonCell"), @selector(drawImage:withFrame:inView:)), (IMP)hookToolbarImage);
    origButtonImage = method_setImplementation(class_getInstanceMethod([NSButtonCell class], @selector(drawImage:withFrame:inView:)), (IMP)hookButtonImage);
+   if (surfaceMax < 1) {
+      origOrderWindow = method_setImplementation(class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:)), (IMP)hookOrderWindow);
+   }
    tooltip = objc_getClass("CTooltipView");
    origTooltipLabel = method_setImplementation(class_getInstanceMethod(tooltip, NSSelectorFromString(@"labelAttributes")), (IMP)hookTooltipLabel);
    origTooltipValue = method_setImplementation(class_getInstanceMethod(tooltip, NSSelectorFromString(@"valueAttributes")), (IMP)hookTooltipValue);
