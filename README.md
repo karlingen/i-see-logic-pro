@@ -4,6 +4,8 @@ A light theme for Logic Pro 13. Logic Pro has only a dark interface. This projec
 
 The theme is a small library that Logic Pro loads at launch. It changes nothing in the Logic Pro app or on disk. If you start Logic Pro from the Dock, you get the normal dark interface. A small launcher app starts Logic Pro with the theme and lets you set the brightness.
 
+![Logic Pro with the Light preset of I See Logic Pro](docs/light-theme.png)
+
 This project is a prototype. It is not from Apple, and Apple does not support it.
 
 ## Requirements
@@ -36,9 +38,21 @@ The build reads the color names from your copy of Logic Pro. It writes `theme/li
 
 The app starts Logic Pro with the theme, and then it quits. The theme loads only at launch, so a change takes effect the next time that you start Logic Pro.
 
+![The launcher app with the Soft preset](docs/launcher.png)
+
 The preview in the app shows some Logic Pro tracks with the current values. The app paints it with the same gray rule as the theme, so it is close to what Logic Pro shows. If Logic Pro is open or if Logic Pro changed after the build, the status line at the bottom tells you what to do.
 
 ## Change the brightness
+
+You decide how light the theme is. A white interface is good in a bright room, but many people find it too bright for long sessions. You can make all the surfaces darker and keep the text black, or select a point between the two.
+
+The theme changes every gray of Logic Pro with one rule. The darkest stock gray becomes the lightness value that you set. The lighter stock grays become darker grays, down to black for white text. Track colors and region colors do not change. Because one rule controls all the grays, two values control the whole interface.
+
+| Stock Logic Pro | Light |
+| --- | --- |
+| ![Logic Pro without the theme](docs/compare-stock.png) | ![Logic Pro with the Light preset](docs/compare-light.png) |
+| Soft | Gray |
+| ![Logic Pro with the Soft preset](docs/compare-soft.png) | ![Logic Pro with the Gray preset](docs/compare-gray.png) |
 
 The app has these controls:
 
@@ -47,7 +61,9 @@ The app has these controls:
 | Lightness | 0.65 to 1 | The lightest gray. A lower value gives a darker interface. |
 | Middle grays | 0.5 to 1.5 | The curve between dark and light grays. A higher value makes the middle grays darker. |
 
-The presets are Light (1 and 0.75), Soft (0.85 and 0.85) and Gray (0.68 and 1). Values below 0.65 are not allowed, because black text then becomes hard to read.
+The presets are Light (1 and 0.75), Soft (0.85 and 0.85) and Gray (0.68 and 1). If you move a slider, the app selects Custom and keeps your values. The app stores them, and the theme uses them each time that you start Logic Pro with the app or with `launch.sh`.
+
+Values below 0.65 are not allowed, because black text then becomes hard to read. At 0.65, black text on the lightest gray has a contrast of about 5.6:1.
 
 ## Use from a terminal
 
