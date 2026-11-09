@@ -1,4 +1,4 @@
-# i-see-logic-pro
+# I See Logic Pro
 
 A light theme for Logic Pro 13. Logic Pro has only a dark interface. This project changes its colors to light colors while Logic Pro runs.
 
