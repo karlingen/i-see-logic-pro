@@ -1,5 +1,6 @@
 // Light theme for Logic Pro, loaded with DYLD_INSERT_LIBRARIES. Changes nothing on disk.
-// Environment: LP_GAMMA tunes gray lightness. LP_OUT and LP_DELAY enable the render test.
+// Environment: LP_GAMMA tunes the gray curve and LP_SURFACE_MAX sets the lightest gray.
+// LP_OUT and LP_DELAY enable the render test.
 #import <AppKit/AppKit.h>
 #import <dlfcn.h>
 #import <execinfo.h>
@@ -36,6 +37,8 @@
 #define TEXT_ALPHA_GAMMA 0.45
 #define SECONDARY_LABEL_ALPHA 0.72
 #define TERTIARY_LABEL_ALPHA 0.5
+// Black text at 0.18 keeps a contrast of about 5.6:1 on this gray.
+#define SURFACE_MAX_MIN 0.65
 
 // A pale blue, because list text is black in this theme.
 static const CGFloat FOCUSED_ROW_COLOR[3] = { 0.72, 0.84, 0.96 };
@@ -46,6 +49,7 @@ typedef enum { STYLE_PLAIN, STYLE_SLOT, STYLE_WELL, STYLE_KNOB, STYLE_THUMB, STY
 static ImageRange logicRanges[MAX_RANGES];
 static volatile int logicRangeCount = 0;
 static double grayGamma = 0.75;
+static double surfaceMax = 1;
 static NSAppearance *trueAqua;
 static CGColorSpaceRef srgbSpace;
 static NSString *outDir;
@@ -103,7 +107,7 @@ static CGFloat mapGray(CGFloat white, CGFloat alpha) {
    if (alpha < 1 && white < SHADOW_LIMIT) {
       return white;
    }
-   return pow(1 - white, grayGamma);
+   return surfaceMax * pow(1 - white, grayGamma);
 }
 
 static BOOL isGrayish(CGFloat r, CGFloat g, CGFloat b) {
@@ -168,12 +172,13 @@ static BOOL isWell(NSString *name) {
 // The gray mapping makes the selected row darker than the rows around it, and the playhead black.
 static CGFloat fixedGray(NSString *name) {
    if ([name isEqualToString:@"TrackHeaderBackgroundSelected"]) {
-      return SELECTED_ROW_WHITE;
+      return SELECTED_ROW_WHITE * surfaceMax;
    }
    return [name isEqualToString:@"PlayheadLineNormal"] ? PLAYHEAD_WHITE : -1;
 }
 
-// These colors are for the bright Piano Roll and Tracks modes, so they are already light.
+// These colors are for the bright Piano Roll and Tracks modes, so they are already light. Their
+// grays only scale to the lightest gray of the theme.
 static BOOL isBrightVariant(NSString *name) {
    return [name hasSuffix:@"_Bright"] || [name hasSuffix:@"BrightColor"];
 }
@@ -194,8 +199,14 @@ static CGColorRef copyMappedColor(CGColorRef color, NSString *name) {
       CGFloat level = (c[0] + c[1] + c[2]) / 3;
       CGFloat spread = fmax(c[0], fmax(c[1], c[2])) - fmin(c[0], fmin(c[1], c[2]));
 
-      if ([name isEqualToString:@"AlternatingLinesSelectedFocused"]) {
-         CGFloat values[4] = { FOCUSED_ROW_COLOR[0], FOCUSED_ROW_COLOR[1], FOCUSED_ROW_COLOR[2], c[3] };
+      if (isBrightVariant(name)) {
+         if (spread < GRAY_SPREAD && surfaceMax < 1) {
+            CGFloat values[4] = { c[0] * surfaceMax, c[1] * surfaceMax, c[2] * surfaceMax, c[3] };
+
+            mapped = CGColorCreate(srgbSpace, values);
+         }
+      } else if ([name isEqualToString:@"AlternatingLinesSelectedFocused"]) {
+         CGFloat values[4] = { FOCUSED_ROW_COLOR[0] * surfaceMax, FOCUSED_ROW_COLOR[1] * surfaceMax, FOCUSED_ROW_COLOR[2] * surfaceMax, c[3] };
 
          mapped = CGColorCreate(srgbSpace, values);
       } else if (fixedGray(name) >= 0) {
@@ -250,7 +261,7 @@ static CGColorRef hookCGColor(id named, SEL sel) {
       tag = [NSNull null];
       NSString *name = [named valueForKey:@"name"];
 
-      if ([singleAppearanceNames containsObject:name] && !isBrightVariant(name)) {
+      if ([singleAppearanceNames containsObject:name]) {
          mapped = copyMappedColor(realCGColor(named), name);
          if (mapped) {
             tag = CFBridgingRelease(mapped);
@@ -344,7 +355,7 @@ static void recolorKnobPixel(uint8_t *px) {
       } else if (isBlack) {
          px[c] = (uint8_t)(px[c] * WELL_FADE);
       } else {
-         px[c] = (uint8_t)(px[c] + (alpha - px[c]) * SLOT_LIGHTEN);
+         px[c] = (uint8_t)(px[c] + (alpha * surfaceMax - px[c]) * SLOT_LIGHTEN);
       }
    }
    if (isBlack) {
@@ -398,7 +409,7 @@ static CGImageRef copyRecoloredImage(CGImageRef image, ImageStyle style) {
          count += 1;
       } else if (style == STYLE_SLOT && alpha > 0) {
          for (int c = 0; c < 3; c++) {
-            px[i + c] = (uint8_t)(px[i + c] + (alpha - px[i + c]) * SLOT_LIGHTEN);
+            px[i + c] = (uint8_t)(px[i + c] + (alpha * surfaceMax - px[i + c]) * SLOT_LIGHTEN);
          }
          count += 1;
       } else if (style == STYLE_WELL && alpha > 0) {
@@ -969,6 +980,9 @@ __attribute__((constructor)) static void start(void) {
 
    if (getenv("LP_GAMMA")) {
       grayGamma = atof(getenv("LP_GAMMA"));
+   }
+   if (getenv("LP_SURFACE_MAX")) {
+      surfaceMax = fmin(1, fmax(SURFACE_MAX_MIN, atof(getenv("LP_SURFACE_MAX"))));
    }
    srgbSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
    for (size_t i = 0; i < sizeof(SINGLE_APPEARANCE_COLORS) / sizeof(SINGLE_APPEARANCE_COLORS[0]); i++) {
