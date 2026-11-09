@@ -142,7 +142,8 @@ static IMP origCGColor, origAppearanceNamed, origAppSetAppearance;
 static IMP origTooltipLabel, origTooltipValue, origTooltipRightValue;
 static IMP origAdjustDarkText, origSetCaretColor, origSetTypingAttributes;
 static IMP origNibDecode, origAppearanceDecode, origHeaderDraw, origToolbarImage, origButtonImage;
-static IMP origOrderWindow;
+static IMP origOrderWindow, origClipBackground;
+static NSColor *scaledControlBackground;
 static Ivar toolbarOnColor;
 static Class notesTextView;
 
@@ -960,6 +961,14 @@ static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode plac
    ((void (*)(id, SEL, NSWindowOrderingMode, NSInteger))origOrderWindow)(window, sel, place, other);
 }
 
+// Legacy scroller tracks are transparent and show the clip view background. Some Logic scroll
+// views, for example in the Piano Roll, use the system controlBackgroundColor, which is white.
+static NSColor *hookClipBackground(NSClipView *view, SEL sel) {
+   NSColor *color = ((NSColor *(*)(id, SEL))origClipBackground)(view, sel);
+
+   return [color isEqual:NSColor.controlBackgroundColor] ? scaledControlBackground : color;
+}
+
 static IMP swapClassMethod(Class cls, SEL sel, IMP hook) {
    return method_setImplementation(class_getClassMethod(cls, sel), hook);
 }
@@ -1048,6 +1057,8 @@ __attribute__((constructor)) static void start(void) {
    origButtonImage = method_setImplementation(class_getInstanceMethod([NSButtonCell class], @selector(drawImage:withFrame:inView:)), (IMP)hookButtonImage);
    if (surfaceMax < 1) {
       origOrderWindow = method_setImplementation(class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:)), (IMP)hookOrderWindow);
+      scaledControlBackground = [NSColor colorWithSRGBRed:surfaceMax green:surfaceMax blue:surfaceMax alpha:1];
+      origClipBackground = method_setImplementation(class_getInstanceMethod([NSClipView class], @selector(backgroundColor)), (IMP)hookClipBackground);
    }
    tooltip = objc_getClass("CTooltipView");
    origTooltipLabel = method_setImplementation(class_getInstanceMethod(tooltip, NSSelectorFromString(@"labelAttributes")), (IMP)hookTooltipLabel);
