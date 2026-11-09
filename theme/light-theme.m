@@ -958,7 +958,7 @@ static void renderTest(void) {
          }
       }
       [log writeToFile:[outDir stringByAppendingPathComponent:@"theme.log"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
-      [NSApp terminate:nil];
+      _exit(0); // Quits with no save prompt, because the test project is a scratch copy.
    });
 }
 
