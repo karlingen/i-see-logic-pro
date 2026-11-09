@@ -1,0 +1,28 @@
+# Builds the launcher app when a version tag such as v1.0.0 is pushed, and attaches it to a
+# GitHub release. The build does not need Logic Pro, because the theme reads the Logic Pro
+# color list on the Mac of the user.
+name: Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: VERSION="${GITHUB_REF_NAME#v}" app/build.sh
+      - name: Package
+        run: ditto -c -k --keepParent "app/I See Logic Pro.app" "ISeeLogicPro-${GITHUB_REF_NAME#v}.zip"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "ISeeLogicPro-${GITHUB_REF_NAME#v}.zip" \
+            --title "I See Logic Pro ${GITHUB_REF_NAME#v}" \
+            --notes "For Logic Pro 13.0 (build 7801) on macOS 26 and Apple silicon. Apple did not notarize this app. See \"Install\" in the README for the steps to open it the first time."

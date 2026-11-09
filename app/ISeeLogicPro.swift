@@ -93,15 +93,17 @@ struct ThemeValues {
 }
 
 enum LaunchStatus {
-   case ready, logicRunning, logicMissing, libraryMissing, logicUpdated, failed(String)
+   case ready, logicRunning, logicMissing, libraryMissing, failed(String)
+   case logicUntested(tested: String, installed: String)
 
    var text: String {
       switch self {
       case .ready: return "Ready. Logic Pro starts with the theme."
       case .logicRunning: return "Quit Logic Pro first. The theme loads only at launch."
       case .logicMissing: return "Logic Pro is not in the Applications folder."
-      case .libraryMissing: return "The theme library is missing. Run app/build.sh again."
-      case .logicUpdated: return "Logic Pro changed after this build. Run app/build.sh again."
+      case .libraryMissing: return "The theme library is missing. Download the app again."
+      case .logicUntested(let tested, let installed):
+         return "Tested with Logic Pro build \(tested), but you have build \(installed). Some parts can stay dark."
       case .failed(let error): return "Logic Pro did not start. \(error)"
       }
    }
@@ -124,7 +126,7 @@ enum LaunchStatus {
 
    var canStart: Bool {
       switch self {
-      case .ready, .logicUpdated, .failed: return true
+      case .ready, .logicUntested, .failed: return true
       default: return false
       }
    }
@@ -145,20 +147,20 @@ func isLogicRunning() -> Bool {
  * @return LaunchStatus - the state to show
  */
 func getLaunchStatus() -> LaunchStatus {
-   let builtFor = Bundle.main.infoDictionary?["LogicBuildVersion"] as? String
+   let tested = Bundle.main.infoDictionary?["TestedLogicBuild"] as? String
    let installed = Bundle(path: LOGIC_PATH)?.infoDictionary?["CFBundleVersion"] as? String
 
    if Bundle.main.path(forResource: "light-theme", ofType: "dylib") == nil {
       return .libraryMissing
    }
-   if installed == nil {
+   guard let installed else {
       return .logicMissing
    }
    if isLogicRunning() {
       return .logicRunning
    }
-   if builtFor != nil && builtFor != installed {
-      return .logicUpdated
+   if let tested, tested != installed {
+      return .logicUntested(tested: tested, installed: installed)
    }
    return .ready
 }
@@ -432,6 +434,17 @@ struct ContentView: View {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+   /**
+    * Removes the download quarantine flag from the theme library in this app bundle. The user
+    * approved this app in Gatekeeper, and without this step macOS asks a second time when
+    * Logic Pro loads the library.
+    */
+   func applicationDidFinishLaunching(_ notification: Notification) {
+      if let library = Bundle.main.path(forResource: "light-theme", ofType: "dylib") {
+         removexattr(library, "com.apple.quarantine", 0)
+      }
+   }
+
    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
       return true
    }

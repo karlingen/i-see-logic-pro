@@ -17,14 +17,17 @@ A developer can have a themed Logic Pro open while you work. Run `pgrep -x 'Logi
 ## Commands
 
 ```sh
-theme/build.sh                # Generates logic-colors.h, then builds and ad-hoc signs light-theme.dylib
+theme/build.sh                # Builds and ad-hoc signs light-theme.dylib
 app/build.sh                  # Runs theme/build.sh, then builds the launcher app with the library inside
+VERSION=1.0.0 app/build.sh    # Sets the app version. The default is dev
 theme/launch.sh [project...]  # Starts Logic Pro with the theme, and rebuilds if the source is newer
 LP_GAMMA=0.75 theme/launch.sh # Tunes the gray curve (0.5 to 1.5). A lower value is brighter
 LP_SURFACE_MAX=0.85 theme/launch.sh # Sets the lightest gray (0.65 to 1)
 ```
 
-Run `theme/build.sh` again after a Logic Pro update, because the color list and the symbol names can change. Git ignores `theme/logic-colors.h`, `*.dylib` and `*.app`. Do not commit `logic-colors.h`, because its data comes from the Logic Pro bundle.
+The build does not need Logic Pro. Git ignores `*.dylib` and `*.app`. Do not commit data from the Logic Pro bundle, such as color names or images.
+
+To publish a release, push a version tag, for example `git tag v1.0.0 && git push origin v1.0.0`. The workflow `.github/workflows/release.yml` builds the app on a GitHub Mac runner and attaches a zip file to a new release. The app is ad-hoc signed and not notarized, so the README tells users how to open it the first time. When you test a new Logic Pro build, change `tested_logic_build` in `app/build.sh`.
 
 There is no linter and no unit test suite. Tests are real launches. `LP_OUT` and `LP_DELAY` make the library render each visible window to a PNG file and then end Logic Pro with no save prompt:
 
@@ -39,9 +42,9 @@ If the project opens slowly, the render finds no visible window. Use an `LP_DELA
 All theme code is in `theme/light-theme.m`. The constructor `start()` installs every hook. Logic Pro has no light theme to turn on, so the library changes colors at the points where they reach the screen. These layers work together:
 
 - Appearance: `+[NSAppearance appearanceNamed:]` maps the dark names to light names, and `NSApp.appearance` stays `Aqua`.
-- Catalog colors: `-[CUINamedColor cgColor]` is the path for both AppKit and SwiftUI. `copyMappedColor` decides the result by color name. It tries `isBrightVariant`, `fixedGray`, `isAccent`, `isWell`, `isTransportText` and the gray mapping, in that order. Saturated colors do not change. Only names in `logic-colors.h` are mapped, which are the names with one appearance.
+- Catalog colors: `-[CUINamedColor cgColor]` is the path for both AppKit and SwiftUI. `copyMappedColor` decides the result by color name. It tries `isBrightVariant`, `fixedGray`, `isAccent`, `isWell`, `isTransportText` and the gray mapping, in that order. Saturated colors do not change. Only the names with one appearance are mapped. At the first launch of each Logic Pro build, `listSingleAppearanceNames` reads them from the Logic Pro catalogs with `/usr/bin/assetutil`. It keeps them in `~/Library/Caches/io.github.karlingen.i-see-logic-pro`.
 - Gray mapping: `mapGray` returns `surfaceMax * pow(1 - white, grayGamma)`. `readSetting` reads the two values from the environment (`LP_SURFACE_MAX` and `LP_GAMMA`) or else from the preferences domain `SETTINGS_DOMAIN`.
-- Launcher: `app/ISeeLogicPro.swift` is a SwiftUI app. It stores `surfaceMax` and `gamma` with `@AppStorage`, so its bundle identifier must be equal to `SETTINGS_DOMAIN`. Its preview copies `mapGray` and `SELECTED_ROW_WHITE`, and its slider limits copy the clamp limits of `light-theme.m`. If you change one of them, change the other too. The stock grays of the preview come from a render of Logic Pro without the theme. `app/build.sh` stores the Logic Pro build number in the app, and the app compares it with the installed Logic Pro. If the two are different, the app shows a warning.
+- Launcher: `app/ISeeLogicPro.swift` is a SwiftUI app. It stores `surfaceMax` and `gamma` with `@AppStorage`, so its bundle identifier must be equal to `SETTINGS_DOMAIN`. Its preview copies `mapGray` and `SELECTED_ROW_WHITE`, and its slider limits copy the clamp limits of `light-theme.m`. If you change one of them, change the other too. The stock grays of the preview come from a render of Logic Pro without the theme. `app/build.sh` stores the tested Logic Pro build in the app, and the app compares it with the installed Logic Pro. If the two are different, the app shows a warning. At launch, the app removes the download quarantine flag from its own library. Then macOS does not show a second warning at the start of Logic Pro.
 - Literal colors: if the caller is inside the Logic Pro bundle, the `NSColor` factory hooks (`WHITE_HOOK`, `RGB_HOOK`, `NAMED_HOOK`) map grays. `addImage` records those code ranges and `isLogicCaller` checks them. `DARKENED_LITERALS` lists saturated literals that must change.
 - Images: `copyRecoloredImage` changes pixels by `ImageStyle`. Named assets pass through `MAAssetManager` and `assetStyle`. Track header images come from a C++ cache and have no names, so `drawStyle` identifies them by size and call stack, once per image. The results stay in associated objects.
 - Nibs: `hookNibDecode` maps literal cell colors and `hookAppearanceDecode` maps a stored `DarkAqua`. Nib decoding skips the factory hooks and `+appearanceNamed:`.
