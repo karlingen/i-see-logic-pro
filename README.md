@@ -68,7 +68,7 @@ Delete the repository folder. Then start Logic Pro from the Dock as usual. Nothi
 
 ## Known limits
 
-- Some text and controls stay dark or have low contrast. Examples are the automation inspector and the Mixer `M` and `S` buttons.
+- Some text and controls stay dark or have low contrast. Examples are the automation inspector and the active Mute button in the Mixer.
 - The theme depends on internal parts of Logic Pro. An update can make parts of the interface dark again.
 - Logic Pro loads the library because Logic Pro 13 allows `DYLD_INSERT_LIBRARIES`. If a future version blocks it, the theme stops working.
 

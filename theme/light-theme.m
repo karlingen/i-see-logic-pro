@@ -39,6 +39,7 @@
 #define TERTIARY_LABEL_ALPHA 0.5
 // Black text at 0.18 keeps a contrast of about 5.6:1 on this gray.
 #define SURFACE_MAX_MIN 0.65
+#define FIELD_DARK_MAX 0.5
 
 // A pale blue, because list text is black in this theme.
 static const CGFloat FOCUSED_ROW_COLOR[3] = { 0.72, 0.84, 0.96 };
@@ -142,7 +143,7 @@ static IMP origCGColor, origAppearanceNamed, origAppSetAppearance;
 static IMP origTooltipLabel, origTooltipValue, origTooltipRightValue;
 static IMP origAdjustDarkText, origSetCaretColor, origSetTypingAttributes;
 static IMP origNibDecode, origAppearanceDecode, origHeaderDraw, origToolbarImage, origButtonImage;
-static IMP origOrderWindow, origClipBackground;
+static IMP origOrderWindow, origClipBackground, origFieldBackground;
 static NSColor *scaledControlBackground;
 static Ivar toolbarOnColor;
 static Class notesTextView;
@@ -861,6 +862,28 @@ static void hookSetTypingAttributes(NSTextView *view, SEL sel, NSDictionary *att
 typedef id __attribute__((ns_returns_retained)) (*CoderInit)(__attribute__((ns_consumed)) id, SEL, NSCoder *);
 
 /**
+ * Returns a component gray mapped for the light theme. Other colors do not change.
+ *
+ * @param color NSColor * - the original color
+ * @param levelMax CGFloat - the highest gray level to map, from 0 to 1
+ * @return NSColor * - the mapped color, or the original color
+ */
+static NSColor *mappedGrayColor(NSColor *color, CGFloat levelMax) {
+   NSColor *rgb = color.type == NSColorTypeComponentBased ? [color colorUsingColorSpace:NSColorSpace.sRGBColorSpace] : nil;
+   CGFloat level, white;
+
+   if (!rgb || !isGrayish(rgb.redComponent, rgb.greenComponent, rgb.blueComponent)) {
+      return color;
+   }
+   level = (rgb.redComponent + rgb.greenComponent + rgb.blueComponent) / 3;
+   if (level > levelMax) {
+      return color;
+   }
+   white = mapGray(level, rgb.alphaComponent);
+   return [NSColor colorWithSRGBRed:white green:white blue:white alpha:rgb.alphaComponent];
+}
+
+/**
  * Decodes a nib object, and maps a literal gray cell color. Nib colors never reach the factory
  * hooks. Colors with other keys stay, because the transport progress bar turns black.
  *
@@ -872,15 +895,25 @@ typedef id __attribute__((ns_returns_retained)) (*CoderInit)(__attribute__((ns_c
 static id hookNibDecode(NSCoder *decoder, SEL sel, NSString *key) {
    id decoded = ((id (*)(id, SEL, NSString *))origNibDecode)(decoder, sel, key);
    BOOL isCellColor = [key isEqualToString:@"NSTextColor"] || [key isEqualToString:@"NSBackgroundColor"];
-   NSColor *color = isCellColor && [decoded isKindOfClass:[NSColor class]] ? decoded : nil;
-   NSColor *rgb = color.type == NSColorTypeComponentBased ? [color colorUsingColorSpace:NSColorSpace.sRGBColorSpace] : nil;
-   CGFloat white;
 
-   if (!rgb || !isGrayish(rgb.redComponent, rgb.greenComponent, rgb.blueComponent)) {
+   if (!isCellColor || ![decoded isKindOfClass:[NSColor class]]) {
       return decoded;
    }
-   white = mapGray((rgb.redComponent + rgb.greenComponent + rgb.blueComponent) / 3, rgb.alphaComponent);
-   return [NSColor colorWithSRGBRed:white green:white blue:white alpha:rgb.alphaComponent];
+   return mappedGrayColor(decoded, 1);
+}
+
+/**
+ * Maps a literal gray text field background that Logic sets in code, for example the track
+ * rename field. Only dark grays change, because a color from the factory hooks is already light.
+ *
+ * @param field NSTextField * - the text field
+ * @param sel SEL - the setBackgroundColor: selector
+ * @param color NSColor * - the new background color
+ */
+static void hookFieldBackground(NSTextField *field, SEL sel, NSColor *color) {
+   NSColor *mapped = isLogicCaller(__builtin_return_address(0)) ? mappedGrayColor(color, FIELD_DARK_MAX) : color;
+
+   ((void (*)(id, SEL, NSColor *))origFieldBackground)(field, sel, mapped);
 }
 
 /**
@@ -1049,6 +1082,7 @@ __attribute__((constructor)) static void start(void) {
    notesTextView = objc_getClass("CLgNotesTextView");
    origSetCaretColor = method_setImplementation(class_getInstanceMethod([NSTextView class], @selector(setInsertionPointColor:)), (IMP)hookSetCaretColor);
    origSetTypingAttributes = method_setImplementation(class_getInstanceMethod([NSTextView class], @selector(setTypingAttributes:)), (IMP)hookSetTypingAttributes);
+   origFieldBackground = method_setImplementation(class_getInstanceMethod([NSTextField class], @selector(setBackgroundColor:)), (IMP)hookFieldBackground);
    origNibDecode = method_setImplementation(class_getInstanceMethod(objc_getClass("UINibDecoder"), @selector(decodeObjectForKey:)), (IMP)hookNibDecode);
    origAppearanceDecode = method_setImplementation(class_getInstanceMethod([NSAppearance class], @selector(initWithCoder:)), (IMP)hookAppearanceDecode);
    origHeaderDraw = method_setImplementation(class_getInstanceMethod([NSTableHeaderView class], @selector(drawRect:)), (IMP)hookHeaderDraw);
