@@ -9,7 +9,6 @@
 #import <mach-o/loader.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
-#import "logic-colors.h"
 
 #define MAX_RANGES 256
 #define ADDRESS_MASK 0x0000ffffffffffffULL
@@ -43,6 +42,9 @@
 #define GAMMA_MIN 0.5
 #define GAMMA_MAX 1.5
 #define SETTINGS_DOMAIN @"io.github.karlingen.i-see-logic-pro"
+// The color list cache, one file for each Logic Pro build, below the home folder.
+#define COLOR_CACHE_DIR @"Library/Caches/io.github.karlingen.i-see-logic-pro"
+#define ASSETUTIL_PATH @"/usr/bin/assetutil"
 #define FIELD_DARK_MAX 0.5
 
 // A pale blue, because list text is black in this theme.
@@ -1055,18 +1057,99 @@ static double readSetting(const char *envName, NSString *key, double fallback, d
    return fmin(high, fmax(low, value));
 }
 
+/**
+ * Adds the color names of one asset catalog and their appearances to a shared table.
+ *
+ * @param path NSString * - the .car file
+ * @param appearances NSMutableDictionary * - color name to the set of its appearances
+ */
+static void addCatalogColors(NSString *path, NSMutableDictionary<NSString *, NSMutableSet *> *appearances) {
+   NSTask *task = [[NSTask alloc] init];
+   NSPipe *pipe = [NSPipe pipe];
+   NSData *output;
+   NSArray *items;
+
+   task.executableURL = [NSURL fileURLWithPath:ASSETUTIL_PATH];
+   task.arguments = @[ @"--info", path ];
+   task.standardOutput = pipe;
+   task.standardError = [NSFileHandle fileHandleWithNullDevice];
+   if (![task launchAndReturnError:nil]) {
+      return;
+   }
+   output = [pipe.fileHandleForReading readDataToEndOfFile];
+   [task waitUntilExit];
+   items = [NSJSONSerialization JSONObjectWithData:output options:0 error:nil];
+   if (![items isKindOfClass:NSArray.class]) {
+      return;
+   }
+   @synchronized (appearances) {
+      for (NSDictionary *item in items) {
+         NSString *name = item[@"Name"];
+
+         if (![item isKindOfClass:NSDictionary.class] || ![item[@"AssetType"] isEqual:@"Color"] || !name) {
+            continue;
+         }
+         if (!appearances[name]) {
+            appearances[name] = [NSMutableSet set];
+         }
+         [appearances[name] addObject:item[@"Appearance"] ?: @"any"];
+      }
+   }
+}
+
+/**
+ * Lists the Logic Pro catalog colors with one appearance. Only these colors are mapped,
+ * because a color with a light appearance already has a light value. The list comes from
+ * the cache, or else from assetutil, which takes about one second for all catalogs.
+ *
+ * @return NSSet * - the color names
+ */
+static NSSet<NSString *> *listSingleAppearanceNames(void) {
+   NSString *contents = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Contents"];
+   NSString *build = NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"] ?: @"unknown";
+   NSString *dir = [NSHomeDirectory() stringByAppendingPathComponent:COLOR_CACHE_DIR];
+   NSString *cache = [dir stringByAppendingPathComponent:[NSString stringWithFormat:@"logic-colors-%@.txt", build]];
+   NSString *saved = [NSString stringWithContentsOfFile:cache encoding:NSUTF8StringEncoding error:nil];
+   NSString *frameworks = [contents stringByAppendingPathComponent:@"Frameworks"];
+   NSMutableArray<NSString *> *catalogs = [NSMutableArray arrayWithObject:[contents stringByAppendingPathComponent:@"Resources/Assets.car"]];
+   NSMutableDictionary<NSString *, NSMutableSet *> *appearances = [NSMutableDictionary dictionary];
+   NSMutableArray<NSString *> *names = [NSMutableArray array];
+
+   if (saved.length > 0) {
+      return [NSSet setWithArray:[saved componentsSeparatedByString:@"\n"]];
+   }
+   for (NSString *framework in [NSFileManager.defaultManager contentsOfDirectoryAtPath:frameworks error:nil]) {
+      NSString *resources = [frameworks stringByAppendingPathComponent:[framework stringByAppendingPathComponent:@"Versions/A/Resources"]];
+
+      for (NSString *file in [NSFileManager.defaultManager contentsOfDirectoryAtPath:resources error:nil]) {
+         if ([file.pathExtension isEqual:@"car"]) {
+            [catalogs addObject:[resources stringByAppendingPathComponent:file]];
+         }
+      }
+   }
+   dispatch_apply(catalogs.count, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^(size_t i) {
+      addCatalogColors(catalogs[i], appearances);
+   });
+   for (NSString *name in appearances) {
+      if (appearances[name].count == 1) {
+         [names addObject:name];
+      }
+   }
+   if (names.count > 0) {
+      [NSFileManager.defaultManager createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+      [[names componentsJoinedByString:@"\n"] writeToFile:cache atomically:YES encoding:NSUTF8StringEncoding error:nil];
+   }
+   return [NSSet setWithArray:names];
+}
+
 __attribute__((constructor)) static void start(void) {
    Class color = [NSColor class];
    Class manager, tooltip;
-   NSMutableSet<NSString *> *names = [NSMutableSet set];
 
    grayGamma = readSetting("LP_GAMMA", @"gamma", grayGamma, GAMMA_MIN, GAMMA_MAX);
    surfaceMax = readSetting("LP_SURFACE_MAX", @"surfaceMax", surfaceMax, SURFACE_MAX_MIN, 1);
    srgbSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-   for (size_t i = 0; i < sizeof(SINGLE_APPEARANCE_COLORS) / sizeof(SINGLE_APPEARANCE_COLORS[0]); i++) {
-      [names addObject:@(SINGLE_APPEARANCE_COLORS[i])];
-   }
-   singleAppearanceNames = names;
+   singleAppearanceNames = listSingleAppearanceNames();
    trueAqua = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
    _dyld_register_func_for_add_image(addImage);
    // These symbols bound the three arrange view region functions, which are adjacent in Logic.
