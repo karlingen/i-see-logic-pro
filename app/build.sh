@@ -8,6 +8,16 @@ rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 swiftc -parse-as-library -O -target arm64-apple-macos14 -o "$app/Contents/MacOS/ISeeLogicPro" ISeeLogicPro.swift || exit 1
 cp ../theme/light-theme.dylib "$app/Contents/Resources/"
+# Draws the icon at 1024 points and scales it to each icon size.
+work=$(mktemp -d) || exit 1
+swiftc -O -o "$work/app-icon" AppIcon.swift && "$work/app-icon" "$work/icon.png" || exit 1
+mkdir "$work/AppIcon.iconset"
+for size in 16 32 128 256 512; do
+   sips -z $size $size "$work/icon.png" --out "$work/AppIcon.iconset/icon_${size}x${size}.png" > /dev/null
+   sips -z $((size * 2)) $((size * 2)) "$work/icon.png" --out "$work/AppIcon.iconset/icon_${size}x${size}@2x.png" > /dev/null
+done
+iconutil -c icns "$work/AppIcon.iconset" -o "$app/Contents/Resources/AppIcon.icns" || exit 1
+rm -r "$work"
 # The Logic Pro build that this version was tested with. The app shows a warning for
 # other builds, because the theme uses internal names that an update can change.
 tested_logic_build=7801
@@ -18,6 +28,7 @@ cat > "$app/Contents/Info.plist" <<EOF
 <plist version="1.0">
 <dict>
    <key>CFBundleExecutable</key><string>ISeeLogicPro</string>
+   <key>CFBundleIconFile</key><string>AppIcon</string>
    <key>CFBundleIdentifier</key><string>io.github.karlingen.i-see-logic-pro</string>
    <key>CFBundleName</key><string>I See Logic Pro</string>
    <key>CFBundlePackageType</key><string>APPL</string>
