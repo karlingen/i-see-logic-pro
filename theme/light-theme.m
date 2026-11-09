@@ -9,6 +9,7 @@
 #import <mach-o/loader.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
+#import "gray-rule.h"
 
 #define MAX_RANGES 256
 #define ADDRESS_MASK 0x0000ffffffffffffULL
@@ -22,7 +23,6 @@
 #define NOTE_TEXT_MIN 0.5
 #define ACCENT_DARKEN 0.4
 #define COLOR_MATCH 0.005
-#define SELECTED_ROW_WHITE 0.95
 #define PLAYHEAD_WHITE 0.3
 #define REGION_OUTLINE_DARKEN 0.65
 #define DRAW_IMAGE_MAX 256
@@ -37,11 +37,8 @@
 #define TEXT_ALPHA_GAMMA 0.45
 #define SECONDARY_LABEL_ALPHA 0.72
 #define TERTIARY_LABEL_ALPHA 0.5
-// Black text at 0.18 keeps a contrast of about 5.6:1 on this gray.
-#define SURFACE_MAX_MIN 0.65
-#define GAMMA_MIN 0.5
-#define GAMMA_MAX 1.5
-#define SETTINGS_DOMAIN @"io.github.karlingen.i-see-logic-pro"
+#define SETTINGS_DOMAIN @SETTINGS_DOMAIN_NAME
+#define LOGIC_BUNDLE_ID @"com.apple.logic10"
 // The color list cache, one file for each Logic Pro build, below the home folder.
 #define COLOR_CACHE_DIR @"Library/Caches/io.github.karlingen.i-see-logic-pro"
 #define ASSETUTIL_PATH @"/usr/bin/assetutil"
@@ -114,7 +111,7 @@ static CGFloat mapGray(CGFloat white, CGFloat alpha) {
    if (alpha < 1 && white < SHADOW_LIMIT) {
       return white;
    }
-   return surfaceMax * pow(1 - white, grayGamma);
+   return mapGrayLevel(white, surfaceMax, grayGamma);
 }
 
 static BOOL isGrayish(CGFloat r, CGFloat g, CGFloat b) {
@@ -1058,6 +1055,37 @@ static double readSetting(const char *envName, NSString *key, double fallback, d
 }
 
 /**
+ * Adds the colors in the JSON output of assetutil and their appearances to a shared table.
+ *
+ * @param output NSData * - the output of assetutil --info
+ * @param appearances NSMutableDictionary * - color name to the set of its appearances
+ */
+static void addColorItems(NSData *output, NSMutableDictionary<NSString *, NSMutableSet *> *appearances) {
+   NSArray *items = output ? [NSJSONSerialization JSONObjectWithData:output options:0 error:nil] : nil;
+
+   if (![items isKindOfClass:NSArray.class]) {
+      return;
+   }
+   @synchronized (appearances) {
+      for (NSDictionary *item in items) {
+         NSString *name;
+
+         if (![item isKindOfClass:NSDictionary.class] || ![item[@"AssetType"] isEqual:@"Color"]) {
+            continue;
+         }
+         name = item[@"Name"];
+         if (![name isKindOfClass:NSString.class]) {
+            continue;
+         }
+         if (!appearances[name]) {
+            appearances[name] = [NSMutableSet set];
+         }
+         [appearances[name] addObject:item[@"Appearance"] ?: @"any"];
+      }
+   }
+}
+
+/**
  * Adds the color names of one asset catalog and their appearances to a shared table.
  *
  * @param path NSString * - the .car file
@@ -1067,7 +1095,6 @@ static void addCatalogColors(NSString *path, NSMutableDictionary<NSString *, NSM
    NSTask *task = [[NSTask alloc] init];
    NSPipe *pipe = [NSPipe pipe];
    NSData *output;
-   NSArray *items;
 
    task.executableURL = [NSURL fileURLWithPath:ASSETUTIL_PATH];
    task.arguments = @[ @"--info", path ];
@@ -1078,23 +1105,7 @@ static void addCatalogColors(NSString *path, NSMutableDictionary<NSString *, NSM
    }
    output = [pipe.fileHandleForReading readDataToEndOfFile];
    [task waitUntilExit];
-   items = [NSJSONSerialization JSONObjectWithData:output options:0 error:nil];
-   if (![items isKindOfClass:NSArray.class]) {
-      return;
-   }
-   @synchronized (appearances) {
-      for (NSDictionary *item in items) {
-         NSString *name = item[@"Name"];
-
-         if (![item isKindOfClass:NSDictionary.class] || ![item[@"AssetType"] isEqual:@"Color"] || !name) {
-            continue;
-         }
-         if (!appearances[name]) {
-            appearances[name] = [NSMutableSet set];
-         }
-         [appearances[name] addObject:item[@"Appearance"] ?: @"any"];
-      }
-   }
+   addColorItems(output, appearances);
 }
 
 /**
@@ -1146,6 +1157,10 @@ __attribute__((constructor)) static void start(void) {
    Class color = [NSColor class];
    Class manager, tooltip;
 
+   // The hooks are only for Logic Pro. This also lets the tests include this file.
+   if (![NSBundle.mainBundle.bundleIdentifier isEqual:LOGIC_BUNDLE_ID]) {
+      return;
+   }
    grayGamma = readSetting("LP_GAMMA", @"gamma", grayGamma, GAMMA_MIN, GAMMA_MAX);
    surfaceMax = readSetting("LP_SURFACE_MAX", @"surfaceMax", surfaceMax, SURFACE_MAX_MIN, 1);
    srgbSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);

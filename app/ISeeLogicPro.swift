@@ -5,14 +5,11 @@ import SwiftUI
 
 let LOGIC_ID = "com.apple.logic10"
 let LOGIC_PATH = "/Applications/Logic Pro.app"
-// The same limits as SURFACE_MAX_MIN, GAMMA_MIN and GAMMA_MAX in light-theme.m.
-let SURFACE_RANGE = 0.65...1.0
-let GAMMA_RANGE = 0.5...1.5
+// The limits, the gray rule and SELECTED_ROW_WHITE come from theme/gray-rule.h.
+let SURFACE_RANGE = SURFACE_MAX_MIN...1.0
+let GAMMA_RANGE = GAMMA_MIN...GAMMA_MAX
 let PRESET_MATCH = 0.005
 let CUSTOM = "Custom"
-// The same value as SELECTED_ROW_WHITE in light-theme.m. The theme sets the selected row
-// to this fraction of the lightest gray.
-let SELECTED_ROW_WHITE = 0.95
 let WINDOW_SIZE = CGSize(width: 720, height: 400)
 let SIDEBAR_WIDTH = 190.0
 let HEADER_WIDTH = 290.0
@@ -73,22 +70,12 @@ let MOCK_TRACKS = [
       hasRecord: false, isSoloed: false, volume: 0.66, regions: [ (3, 2), (7, 2) ]),
 ]
 
-/**
- * The gray rule of mapGray in light-theme.m.
- *
- * @param white Double - the stock gray level
- * @return Double - the themed gray level
- */
-func mapGray(_ white: Double, surfaceMax: Double, gamma: Double) -> Double {
-   return surfaceMax * pow(1 - white, gamma)
-}
-
 struct ThemeValues {
    let surfaceMax: Double
    let gamma: Double
 
    func gray(_ stock: Double) -> Color {
-      return Color(white: mapGray(stock, surfaceMax: surfaceMax, gamma: gamma))
+      return Color(white: mapGrayLevel(stock, surfaceMax, gamma))
    }
 }
 
