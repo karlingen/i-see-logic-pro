@@ -1,3 +1,4 @@
 *.dylib
 theme/logic-colors.h
 .DS_Store
+*.app

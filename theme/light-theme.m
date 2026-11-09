@@ -1,5 +1,6 @@
 // Light theme for Logic Pro, loaded with DYLD_INSERT_LIBRARIES. Changes nothing on disk.
-// Environment: LP_GAMMA tunes the gray curve and LP_SURFACE_MAX sets the lightest gray.
+// The launcher app stores surfaceMax and gamma in the SETTINGS_DOMAIN preferences.
+// The environment variables LP_SURFACE_MAX and LP_GAMMA override them.
 // LP_OUT and LP_DELAY enable the render test.
 #import <AppKit/AppKit.h>
 #import <dlfcn.h>
@@ -39,6 +40,9 @@
 #define TERTIARY_LABEL_ALPHA 0.5
 // Black text at 0.18 keeps a contrast of about 5.6:1 on this gray.
 #define SURFACE_MAX_MIN 0.65
+#define GAMMA_MIN 0.5
+#define GAMMA_MAX 1.5
+#define SETTINGS_DOMAIN @"io.github.karlingen.i-see-logic-pro"
 #define FIELD_DARK_MAX 0.5
 
 // A pale blue, because list text is black in this theme.
@@ -1029,17 +1033,35 @@ static void renderTest(void) {
    });
 }
 
+/**
+ * Reads a number from the environment, or else from the launcher preferences, and clamps it.
+ *
+ * @param envName const char * - the environment variable, which wins over the preferences
+ * @param key NSString * - the key in SETTINGS_DOMAIN
+ * @param fallback double - the value if neither source has one
+ * @param low double - the lowest allowed value
+ * @param high double - the highest allowed value
+ * @return double - the value
+ */
+static double readSetting(const char *envName, NSString *key, double fallback, double low, double high) {
+   id stored = [[[NSUserDefaults alloc] initWithSuiteName:SETTINGS_DOMAIN] objectForKey:key];
+   double value = fallback;
+
+   if (getenv(envName)) {
+      value = atof(getenv(envName));
+   } else if ([stored respondsToSelector:@selector(doubleValue)]) {
+      value = [stored doubleValue];
+   }
+   return fmin(high, fmax(low, value));
+}
+
 __attribute__((constructor)) static void start(void) {
    Class color = [NSColor class];
    Class manager, tooltip;
    NSMutableSet<NSString *> *names = [NSMutableSet set];
 
-   if (getenv("LP_GAMMA")) {
-      grayGamma = atof(getenv("LP_GAMMA"));
-   }
-   if (getenv("LP_SURFACE_MAX")) {
-      surfaceMax = fmin(1, fmax(SURFACE_MAX_MIN, atof(getenv("LP_SURFACE_MAX"))));
-   }
+   grayGamma = readSetting("LP_GAMMA", @"gamma", grayGamma, GAMMA_MIN, GAMMA_MAX);
+   surfaceMax = readSetting("LP_SURFACE_MAX", @"surfaceMax", surfaceMax, SURFACE_MAX_MIN, 1);
    srgbSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
    for (size_t i = 0; i < sizeof(SINGLE_APPEARANCE_COLORS) / sizeof(SINGLE_APPEARANCE_COLORS[0]); i++) {
       [names addObject:@(SINGLE_APPEARANCE_COLORS[i])];

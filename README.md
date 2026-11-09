@@ -2,7 +2,7 @@
 
 A light theme for Logic Pro 13. Logic Pro has only a dark interface. This project changes its colors to light colors while Logic Pro runs.
 
-The theme is a small library that Logic Pro loads at launch. It changes nothing in the Logic Pro app or on disk. If you start Logic Pro from the Dock, you get the normal dark interface.
+The theme is a small library that Logic Pro loads at launch. It changes nothing in the Logic Pro app or on disk. If you start Logic Pro from the Dock, you get the normal dark interface. A small launcher app starts Logic Pro with the theme and lets you set the brightness.
 
 This project is a prototype. It is not from Apple, and Apple does not support it.
 
@@ -17,17 +17,41 @@ This project is a prototype. It is not from Apple, and Apple does not support it
 
 1. Clone this repository.
 2. Quit Logic Pro.
-3. Build the library:
+3. Build the launcher app and the theme library:
 
    ```sh
-   theme/build.sh
+   app/build.sh
    ```
 
-The build reads the color names from your copy of Logic Pro. It writes `theme/light-theme.dylib` and signs it for your Mac only.
+4. Optional: move `app/I See Logic Pro.app` to your Applications folder.
+
+The build reads the color names from your copy of Logic Pro. It writes `theme/light-theme.dylib` and copies it into `app/I See Logic Pro.app`. It signs both for your Mac only.
 
 ## Use
 
-Quit Logic Pro, then start it with the theme:
+1. Quit Logic Pro.
+2. Open `I See Logic Pro.app`.
+3. Select a preset in the sidebar, or move the sliders.
+4. Click Start Logic Pro.
+
+The app starts Logic Pro with the theme, and then it quits. The theme loads only at launch, so a change takes effect the next time that you start Logic Pro.
+
+The preview in the app shows some Logic Pro tracks with the current values. The app paints it with the same gray rule as the theme, so it is close to what Logic Pro shows. If Logic Pro is open or if Logic Pro changed after the build, the status line at the bottom tells you what to do.
+
+## Change the brightness
+
+The app has these controls:
+
+| Control | Range | Effect |
+| --- | --- | --- |
+| Lightness | 0.65 to 1 | The lightest gray. A lower value gives a darker interface. |
+| Middle grays | 0.5 to 1.5 | The curve between dark and light grays. A higher value makes the middle grays darker. |
+
+The presets are Light (1 and 0.75), Soft (0.85 and 0.85) and Gray (0.68 and 1). Values below 0.65 are not allowed, because black text then becomes hard to read.
+
+## Use from a terminal
+
+You can also start Logic Pro with the theme from a terminal:
 
 ```sh
 theme/launch.sh
@@ -39,32 +63,32 @@ To open projects at the same time, add their paths:
 theme/launch.sh ~/Music/Logic/MySong.logicx
 ```
 
-The theme loads only at launch. If Logic Pro is open, `launch.sh` stops and tells you to quit Logic Pro first.
-
-## Change the brightness
-
-Two environment variables control the grays:
-
-| Variable | Default | Effect |
-| --- | --- | --- |
-| `LP_SURFACE_MAX` | `1` | The lightest gray, from `0.65` to `1`. A lower value gives a darker interface. |
-| `LP_GAMMA` | `0.75` | The curve between dark and light grays. A lower value makes the middle grays brighter. |
-
-If the theme is too bright for you, try a lower `LP_SURFACE_MAX`:
+If Logic Pro is open, `launch.sh` stops and tells you to quit Logic Pro first. `launch.sh` uses the settings of the app. Two environment variables override them for one launch:
 
 ```sh
 LP_SURFACE_MAX=0.85 LP_GAMMA=0.85 theme/launch.sh
 ```
 
-Values below `0.65` are not allowed, because black text then becomes hard to read.
+`LP_SURFACE_MAX` is the lightness, and `LP_GAMMA` is the middle grays value. To change the stored settings without the app, use `defaults`:
+
+```sh
+defaults write io.github.karlingen.i-see-logic-pro surfaceMax -float 0.85
+```
 
 ## After a Logic Pro update
 
-Run `theme/build.sh` again. An update can change the color names and the internal functions that the theme uses. If the build or the launch fails after an update, open an issue with your Logic Pro version.
+Run `app/build.sh` again. An update can change the color names and the internal functions that the theme uses. If you moved the app to your Applications folder, move the new app there too. If the build or the launch fails after an update, open an issue with your Logic Pro version.
 
 ## Remove
 
-Delete the repository folder. Then start Logic Pro from the Dock as usual. Nothing else was installed.
+1. Delete the repository folder. If you moved the app, delete it too.
+2. Delete the stored settings:
+
+   ```sh
+   defaults delete io.github.karlingen.i-see-logic-pro
+   ```
+
+3. Start Logic Pro from the Dock as usual.
 
 ## Known limits
 
