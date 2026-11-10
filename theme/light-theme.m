@@ -59,7 +59,7 @@ static CGColorSpaceRef srgbSpace;
 static NSString *outDir;
 static int recoloredImages = 0;
 static uintptr_t regionDrawStart, regionDrawEnd;
-static ImageRange panKnobDraw, arrangeKnobDraw, trackHeaderDraw, textDraw, rulerMarkerDraw;
+static ImageRange panKnobDraw, arrangeKnobDraw, trackHeaderDraw, textDraw, rulerMarkerDraw, threePartDraw;
 static CGColorRef (*fillColorOf)(CGContextRef);
 
 /**
@@ -141,7 +141,7 @@ static char mappedKey, bevelKey, whiteKey;
 static BOOL isOnBevel;
 static CGRect coloredBevel;
 static NSSet<NSString *> *singleAppearanceNames;
-static IMP origCompositeImage, origCatalogImage, origImageDraw, origRepDraw;
+static IMP origCompositeImage, origCatalogImage, origImageDraw, origRepDraw, origBestRep;
 static IMP origCGColor, origAppearanceNamed, origAppSetAppearance;
 static IMP origTooltipLabel, origTooltipValue, origTooltipRightValue;
 static IMP origAdjustDarkText, origSetCaretColor, origSetTypingAttributes;
@@ -443,6 +443,8 @@ static NSBitmapImageRep *recoloredRep(NSImageRep *rep, ImageStyle style) {
    }
    replacement = [[NSBitmapImageRep alloc] initWithCGImage:changed];
    replacement.size = rep.size;
+   // The rep hook must not change a replacement a second time.
+   objc_setAssociatedObject(replacement, &mappedKey, [NSNull null], OBJC_ASSOCIATION_RETAIN);
    CGImageRelease(changed);
    recoloredImages += 1;
    return replacement;
@@ -717,6 +719,21 @@ static void hookImageDraw(NSImage *image, SEL sel, NSRect rect, NSRect from, NSC
    NSImage *shown = isLogicCaller(__builtin_return_address(0)) ? drawableImage(image) : image;
 
    ((ImageDraw)origImageDraw)(shown, sel, rect, from, op, fraction, flipped, hints);
+}
+
+/**
+ * Returns the best rep of the recolored copy of an image. MADrawingThreePartImage draws the
+ * center piece from this rep, for example the 1 by 20 center of the track header volume slider.
+ * The rep is an NSImageRepGeometryProxy, which has its own draw method, so the rep hook misses it.
+ *
+ * @param image NSImage * - the image
+ * @return NSImageRep * - the rep to draw
+ */
+static NSImageRep *hookBestRep(NSImage *image, SEL sel, NSRect rect, NSGraphicsContext *context, NSDictionary *hints) {
+   uintptr_t caller = (uintptr_t)__builtin_return_address(0) & ADDRESS_MASK;
+   NSImage *shown = caller >= threePartDraw.start && caller < threePartDraw.end ? drawableImage(image) : image;
+
+   return ((NSImageRep *(*)(id, SEL, NSRect, id, id))origBestRep)(shown, sel, rect, context, hints);
 }
 
 static void interposeThreePart(NSRect frame, NSImage *start, NSImage *center, NSImage *end, BOOL vertical, NSCompositingOperation op, CGFloat fraction, BOOL flipped) {
@@ -1224,6 +1241,7 @@ __attribute__((constructor)) static void start(void) {
    trackHeaderDraw = functionRange("_Z13DoTrackHeaderR6U_VARS19TPosOneBasedTrackNrxP6CTrackS3_PK16TTrackHeaderDataP5CMSeqPKS2_SA_i", "_Z17DoAllTrackHeadersR6U_VARSP7FENSTERPv");
    textDraw = functionRange("_ZN2GC8drawTextEddPKtmd", "_ZN2GC8drawTextEddPK10__CFStringd");
    rulerMarkerDraw = functionRange("_Z12PrintMarkersR6U_VARSP5CSongP7FENSTERxx19TSignedAbsPureClockb", "_Z18ColoredMarkerAchseP5CSongP7FENSTERxxb");
+   threePartDraw = functionRange("MADrawingThreePartImage", "MADrawingTwoPartVerticalImage");
    fillColorOf = dlsym(RTLD_DEFAULT, "CGContextGetFillColorAsColor");
 
    origAppearanceNamed = swapClassMethod([NSAppearance class], @selector(appearanceNamed:), (IMP)hookAppearanceNamed);
@@ -1249,6 +1267,7 @@ __attribute__((constructor)) static void start(void) {
    origCatalogImage = method_setImplementation(class_getInstanceMethod(manager, NSSelectorFromString(@"UICatalogFromDescription:withContext:")), (IMP)hookCatalogImage);
    origImageDraw = method_setImplementation(class_getInstanceMethod([NSImage class], @selector(drawInRect:fromRect:operation:fraction:respectFlipped:hints:)), (IMP)hookImageDraw);
    origRepDraw = method_setImplementation(class_getInstanceMethod([NSImageRep class], @selector(drawInRect:fromRect:operation:fraction:respectFlipped:hints:)), (IMP)hookRepDraw);
+   origBestRep = method_setImplementation(class_getInstanceMethod([NSImage class], @selector(bestRepresentationForRect:context:hints:)), (IMP)hookBestRep);
    origAdjustDarkText = method_setImplementation(class_getInstanceMethod(objc_getClass("CLgNotesTextView"), NSSelectorFromString(@"adjustDarkText")), (IMP)hookAdjustDarkText);
    notesTextView = objc_getClass("CLgNotesTextView");
    origSetCaretColor = method_setImplementation(class_getInstanceMethod([NSTextView class], @selector(setInsertionPointColor:)), (IMP)hookSetCaretColor);
