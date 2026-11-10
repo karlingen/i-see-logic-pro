@@ -43,6 +43,7 @@
 #define COLOR_CACHE_DIR @"Library/Caches/io.github.karlingen.i-see-logic-pro"
 #define ASSETUTIL_PATH @"/usr/bin/assetutil"
 #define FIELD_DARK_MAX 0.5
+#define PLATTER_ALPHA 0.35
 
 // A pale blue, because list text is black in this theme.
 static const CGFloat FOCUSED_ROW_COLOR[3] = { 0.72, 0.84, 0.96 };
@@ -146,7 +147,7 @@ static IMP origCGColor, origAppearanceNamed, origAppSetAppearance;
 static IMP origTooltipLabel, origTooltipValue, origTooltipRightValue;
 static IMP origAdjustDarkText, origSetCaretColor, origSetTypingAttributes;
 static IMP origNibDecode, origAppearanceDecode, origHeaderDraw, origToolbarImage, origButtonImage;
-static IMP origOrderWindow, origClipBackground, origFieldBackground;
+static IMP origOrderWindow, origClipBackground, origFieldBackground, origPlatterLayout;
 static NSColor *scaledControlBackground;
 static Ivar toolbarOnColor;
 static Class notesTextView;
@@ -1071,6 +1072,19 @@ static NSColor *hookClipBackground(NSClipView *view, SEL sel) {
    return [color isEqual:NSColor.controlBackgroundColor] ? scaledControlBackground : color;
 }
 
+// On macOS 26, the toolbar groups sit on glass platters, which are near white in Aqua. On a
+// gray title bar they stand out, so the glass becomes partly transparent. A glass container
+// above the platters renders all of them, so the opacity goes on that container. The buttons are
+// not inside it. A tint, or an opacity on a platter, does not change the lightness.
+static void hookPlatterLayout(NSView *platter, SEL sel) {
+   NSView *glass = platter.superview.superview;
+
+   if ([glass isKindOfClass:objc_getClass("NSGlassContainerView")] && glass.alphaValue != PLATTER_ALPHA) {
+      glass.alphaValue = PLATTER_ALPHA;
+   }
+   ((void (*)(id, SEL))origPlatterLayout)(platter, sel);
+}
+
 static IMP swapClassMethod(Class cls, SEL sel, IMP hook) {
    return method_setImplementation(class_getClassMethod(cls, sel), hook);
 }
@@ -1283,6 +1297,9 @@ __attribute__((constructor)) static void start(void) {
       origOrderWindow = method_setImplementation(class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:)), (IMP)hookOrderWindow);
       scaledControlBackground = [NSColor colorWithSRGBRed:surfaceMax green:surfaceMax blue:surfaceMax alpha:1];
       origClipBackground = method_setImplementation(class_getInstanceMethod([NSClipView class], @selector(backgroundColor)), (IMP)hookClipBackground);
+      if (objc_getClass("NSToolbarPlatterView")) {
+         origPlatterLayout = method_setImplementation(class_getInstanceMethod(objc_getClass("NSToolbarPlatterView"), @selector(layout)), (IMP)hookPlatterLayout);
+      }
    }
    tooltip = objc_getClass("CTooltipView");
    origTooltipLabel = method_setImplementation(class_getInstanceMethod(tooltip, NSSelectorFromString(@"labelAttributes")), (IMP)hookTooltipLabel);
