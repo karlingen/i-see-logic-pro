@@ -40,4 +40,6 @@ cat > "$app/Contents/Info.plist" <<EOF
 </dict>
 </plist>
 EOF
-codesign -s - -f "$app"
+codesign -s - -f "$app" || exit 1
+# Finder keeps the icon that it read while the bundle was incomplete, until the bundle date changes.
+touch "$app"
