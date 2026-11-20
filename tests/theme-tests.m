@@ -43,15 +43,15 @@ static void testTextContrast(void) {
    double grayButton = mapGrayLevel(STOCK_TEXT_BACKGROUND, 0.68, 1);
    double lightButton = mapGrayLevel(STOCK_TEXT_BACKGROUND, 1, 0.75);
 
-   check(contrastOn(mapTextLevel(0.7, 0.68, 1), grayButton) >= TEXT_CONTRAST - 0.01, "secondary text keeps its contrast at Gray");
+   check(contrastOn(mapTextLevel(0.7, 0.68, 1, TEXT_CONTRAST), grayButton) >= TEXT_CONTRAST - 0.01, "secondary text keeps its contrast at Gray");
    // At the darkest setting, even black cannot reach TEXT_CONTRAST on a button, so all text is black.
-   check(isClose(mapTextLevel(FOREGROUND_MIN, SURFACE_MAX_MIN, GAMMA_MAX), 0), "all text is black at the darkest setting");
-   check(contrastOn(mapTextLevel(0.7, 1, 0.75), lightButton) >= TEXT_CONTRAST - 0.01, "secondary text keeps its contrast at Light");
+   check(isClose(mapTextLevel(FOREGROUND_MIN, SURFACE_MAX_MIN, GAMMA_MAX, TEXT_CONTRAST), 0), "all text is black at the darkest setting");
+   check(contrastOn(mapTextLevel(0.7, 1, 0.75, TEXT_CONTRAST), lightButton) >= TEXT_CONTRAST - 0.01, "secondary text keeps its contrast at Light");
    check(isClose(mapGrayLevel(0.7, 0.68, 1), 0.68 * 0.3), "a light gray that is not text keeps the curve");
-   check(mapTextAlpha(1, 0.35, 0.68, 1) > 0.8, "translucent text gets more opacity at Gray");
-   check(isClose(mapTextAlpha(1, 0.7, 1, 0.75), 0.7), "translucent text with enough contrast does not change");
-   check(isClose(mapTextAlpha(1, 0.1, 0.68, 1), 0.1), "a light overlay keeps its opacity");
-   check(isClose(mapTextAlpha(0.2, 0.5, 0.68, 1), 0.5), "a translucent surface gray keeps its opacity");
+   check(mapTextAlpha(1, 0.35, 0.68, 1, TEXT_CONTRAST) > 0.8, "translucent text gets more opacity at Gray");
+   check(isClose(mapTextAlpha(1, 0.7, 1, 0.75, TEXT_CONTRAST), 0.7), "translucent text with enough contrast does not change");
+   check(isClose(mapTextAlpha(1, 0.1, 0.68, 1, TEXT_CONTRAST), 0.1), "a light overlay keeps its opacity");
+   check(isClose(mapTextAlpha(0.2, 0.5, 0.68, 1, TEXT_CONTRAST), 0.5), "a translucent surface gray keeps its opacity");
 }
 
 static void testSettings(void) {
@@ -112,6 +112,25 @@ static void testClassicRule(void) {
    check(isClose(mapClassicLevel(0.149), 0.341), "a track row gets the Logic Pro 12 gray");
    check(isClose(mapClassicLevel(0.7), 0.7), "text grays do not change in the classic mode");
    check(mapClassicLevel(0.1) > 0.1 && mapClassicLevel(0.1) < mapClassicLevel(0.2), "the classic curve lifts and keeps the order");
+}
+
+/**
+ * Checks the contrast setting: a higher value must darken secondary text, never lighten it,
+ * and must keep the requested contrast where the surfaces allow it.
+ */
+static void testContrastSetting(void) {
+   double light = 1;
+   double gamma = 0.75;
+
+   check(mapTextLevel(0.7, light, gamma, 4.5) > mapTextLevel(0.7, light, gamma, 9),
+      "a higher contrast darkens secondary text");
+   check(mapTextLevel(0.7, light, gamma, 12) <= mapTextLevel(0.7, light, gamma, 4.5),
+      "the darkest setting is never lighter");
+   check(contrastOn(mapTextLevel(0.7, light, gamma, 9), mapGrayLevel(STOCK_TEXT_BACKGROUND, light, gamma)) >= 8.5,
+      "the requested contrast is kept at Light");
+   // Measured from the rule: the text limit of the Light preset is 0.340 at 4.5 and 0.053 at 12.
+   check(isClose(textLimit(1, 0.75, 4.5), 0.340), "the text limit at 4.5 is 0.340");
+   check(isClose(textLimit(1, 0.75, 12), 0.053), "the text limit at 12 is 0.053");
 }
 
 int main(void) {

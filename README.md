@@ -108,6 +108,23 @@ The theme reads the Logic Pro 12 grays from Logic Pro 13 at each launch, because
 
 ![Logic Pro in the Classic mode of I See Logic Pro](docs/classic-theme.png)
 
+The contrast setting applies to the light theme. The Classic mode keeps the grays of
+Logic Pro 12 and leaves the text grays as they are, so the slider does nothing there.
+
+## Starting Logic Pro without the theme
+
+The switch **No theme** under the preset list starts Logic Pro the plain way, without injecting
+the library, so it looks exactly as Apple ships it. Starting Logic Pro from the Dock does the
+same thing; the theme only comes in when you start it from this window or with
+`theme/launch.sh`.
+
+## Checking for updates
+
+The button **Check for Updates** asks GitHub for the newest release and shows the version under
+the status line. When a newer release exists, a second button opens its download page. It does
+not replace the app itself: an ad-hoc signed bundle that overwrites itself is a good way to end
+up with something that no longer starts.
+
 ## Use from a terminal
 
 You can also start Logic Pro with the theme from a terminal:

@@ -14,6 +14,10 @@
 #define STOCK_TEXT_BACKGROUND 0.26
 // The contrast that text keeps on that surface at every setting.
 #define TEXT_CONTRAST 4.5
+/* The contrast that secondary text keeps. Higher values darken the text, so the interface
+   looks less washed out; 4.5 is the minimum the rule was built on. (20.11.2026) */
+#define TEXT_CONTRAST_MIN 4.5
+#define TEXT_CONTRAST_MAX 12.0
 // Translucent text grays at or above this opacity get more opacity when they need it. Lighter
 // overlays, such as hover fills, keep their opacity.
 #define TEXT_ALPHA_MIN 0.3
@@ -41,9 +45,9 @@ static inline double textBackground(double surfaceMax, double gamma) {
    return surfaceMax * pow(1 - STOCK_TEXT_BACKGROUND, gamma);
 }
 
-// The lightest text gray with TEXT_CONTRAST on a themed button.
-static inline double textLimit(double surfaceMax, double gamma) {
-   return toSRGB(fmax(0, (toLinear(textBackground(surfaceMax, gamma)) + 0.05) / TEXT_CONTRAST - 0.05));
+// The lightest text gray with the given contrast on a themed button.
+static inline double textLimit(double surfaceMax, double gamma, double contrast) {
+   return toSRGB(fmax(0, (toLinear(textBackground(surfaceMax, gamma)) + 0.05) / contrast - 0.05));
 }
 
 static inline double mapGrayLevel(double white, double surfaceMax, double gamma) {
@@ -59,8 +63,8 @@ static inline double mapGrayLevel(double white, double surfaceMax, double gamma)
  * @param gamma double - the curve between the two ends
  * @return double - the themed gray level
  */
-static inline double mapTextLevel(double white, double surfaceMax, double gamma) {
-   return fmin(mapGrayLevel(white, surfaceMax, gamma), textLimit(surfaceMax, gamma));
+static inline double mapTextLevel(double white, double surfaceMax, double gamma, double contrast) {
+   return fmin(mapGrayLevel(white, surfaceMax, gamma), textLimit(surfaceMax, gamma, contrast));
 }
 
 /**
@@ -73,14 +77,15 @@ static inline double mapTextLevel(double white, double surfaceMax, double gamma)
  * @param gamma double - the curve between the two ends
  * @return double - the new opacity
  */
-static inline double mapTextAlpha(double white, double alpha, double surfaceMax, double gamma) {
+static inline double mapTextAlpha(double white, double alpha, double surfaceMax, double gamma,
+                                  double contrast) {
    double back = textBackground(surfaceMax, gamma);
-   double text = mapTextLevel(white, surfaceMax, gamma);
+   double text = mapTextLevel(white, surfaceMax, gamma, contrast);
 
    if (white < FOREGROUND_MIN || alpha < TEXT_ALPHA_MIN || alpha >= 1 || back <= text) {
       return alpha;
    }
-   return fmin(1, fmax(alpha, (back - textLimit(surfaceMax, gamma)) / (back - text)));
+   return fmin(1, fmax(alpha, (back - textLimit(surfaceMax, gamma, contrast)) / (back - text)));
 }
 
 // The classic mode lifts the opaque Logic Pro 13 grays to the Logic Pro 12 grays. Each pair is a

@@ -66,6 +66,8 @@ static ImageRange plugInRanges[MAX_PLUG_IN_RANGES];
 static volatile int plugInRangeCount = 0;
 static double grayGamma = 0.75;
 static double surfaceMax = 1;
+// The contrast that secondary text keeps, see TEXT_CONTRAST_MIN in gray-rule.h.
+static double textContrast = TEXT_CONTRAST;
 // The classic mode keeps Logic Pro dark and uses the Logic Pro 12 grays, see copyClassicColor.
 static BOOL isClassic = NO;
 static double accentDarken = ACCENT_DARKEN;
@@ -350,9 +352,9 @@ static CGColorRef copyMappedColor(CGColorRef color, NSString *name) {
          mapped = CGColorCreate(srgbSpace, values);
       } else if (spread < GRAY_SPREAD) {
          BOOL isText = isTextLabel(name) && level >= FOREGROUND_MIN;
-         CGFloat white = isText ? mapTextLevel(level, surfaceMax, grayGamma) : mapGray(level, c[3]);
+         CGFloat white = isText ? mapTextLevel(level, surfaceMax, grayGamma, textContrast) : mapGray(level, c[3]);
          CGFloat labelAlpha = isTextLabel(name) ? pow(c[3], TEXT_ALPHA_GAMMA) : c[3];
-         CGFloat values[4] = { 0, 0, 0, isText ? mapTextAlpha(level, labelAlpha, surfaceMax, grayGamma) : labelAlpha };
+         CGFloat values[4] = { 0, 0, 0, isText ? mapTextAlpha(level, labelAlpha, surfaceMax, grayGamma, textContrast) : labelAlpha };
 
          tintGray(white, values);
          mapped = CGColorCreate(srgbSpace, values);
@@ -1302,8 +1304,64 @@ static void hookPlatterLayout(NSView *platter, SEL sel) {
    ((void (*)(id, SEL))origPlatterLayout)(platter, sel);
 }
 
+/* A hook that is skipped must be counted, not passed to the runtime as null. (20.11.2026) */
+/* The build this theme was written for. Another build may work, but say so once. */
+#define TESTED_BUILD @"7801"
+
+static int hooksInstalled;
+static int hooksSkipped;
+static char skippedNames[512];
+
+static void noteSkipped(const char *name, const char *selector) {
+   size_t used = strlen(skippedNames);
+
+   if (used + strlen(name) + strlen(selector) + 3 < sizeof(skippedNames)) {
+      if (used) {
+         strcat(skippedNames, " ");
+      }
+      strcat(skippedNames, name);
+      strcat(skippedNames, ".");
+      strcat(skippedNames, selector);
+   }
+   hooksSkipped++;
+}
+
+/* Reports what was installed and with which settings, so a broken installation is visible
+   instead of silent. With LP_DEBUG=1 it always speaks; otherwise only when a hook is missing. */
+static void reportStart(void) {
+   if (hooksSkipped || getenv("LP_DEBUG")) {
+      NSLog(@"I See Logic Pro: Logic Pro %@ build %@, %d hook%s, %d skipped, "
+            @"lightness %.2f, middle grays %.2f, contrast %.1f, palette %@%s%s",
+            NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"] ?: @"?",
+            NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"] ?: @"?",
+            hooksInstalled, hooksInstalled == 1 ? "" : "s", hooksSkipped,
+            surfaceMax, grayGamma, textContrast,
+            isClassic ? @"classic" : @"light",
+            hooksSkipped ? ": " : "",
+            hooksSkipped ? skippedNames : "");
+   }
+}
+
+static IMP swapInstanceMethod(Class cls, SEL sel, IMP hook) {
+   Method method = cls ? class_getInstanceMethod(cls, sel) : NULL;
+
+   if (!method) {
+      noteSkipped(class_getName(cls) ?: "?", sel_getName(sel));
+      return NULL;
+   }
+   hooksInstalled++;
+   return method_setImplementation(method, hook);
+}
+
 static IMP swapClassMethod(Class cls, SEL sel, IMP hook) {
-   return method_setImplementation(class_getClassMethod(cls, sel), hook);
+   Method method = cls ? class_getClassMethod(cls, sel) : NULL;
+
+   if (!method) {
+      noteSkipped(class_getName(cls) ?: "?", sel_getName(sel));
+      return NULL;
+   }
+   hooksInstalled++;
+   return method_setImplementation(method, hook);
 }
 
 static void renderTest(void) {
@@ -1492,14 +1550,21 @@ __attribute__((constructor)) static void start(void) {
    if (![NSBundle.mainBundle.bundleIdentifier isEqual:LOGIC_BUNDLE_ID]) {
       return;
    }
+   if (![NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"] isEqual:TESTED_BUILD]) {
+      NSLog(@"I See Logic Pro: this Logic Pro build (%@) is not the tested one (%@). "
+            @"Run with LP_DEBUG=1 for details, or start Logic Pro without the theme.",
+            NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"] ?: @"?", TESTED_BUILD);
+   }
    grayGamma = readSetting("LP_GAMMA", @"gamma", grayGamma, GAMMA_MIN, GAMMA_MAX);
    surfaceMax = readSetting("LP_SURFACE_MAX", @"surfaceMax", surfaceMax, SURFACE_MAX_MIN, 1);
+   textContrast = readSetting("LP_CONTRAST", @"contrast", TEXT_CONTRAST, TEXT_CONTRAST_MIN, TEXT_CONTRAST_MAX);
    accentDarken = ACCENT_DARKEN * pow(surfaceMax, ACCENT_SURFACE_POWER);
    readTint();
    srgbSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
    isClassic = readSetting("LP_CLASSIC", @"classic", 0, 0, 1) >= 0.5;
    if (isClassic) {
-      origCGColor = method_setImplementation(class_getInstanceMethod(NSClassFromString(@"CUINamedColor"), @selector(cgColor)), (IMP)hookCGColor);
+      origCGColor = swapInstanceMethod(NSClassFromString(@"CUINamedColor"), @selector(cgColor), (IMP)hookCGColor);
+      reportStart();
       if (getenv("LP_OUT")) {
          outDir = [NSString stringWithUTF8String:getenv("LP_OUT")];
          renderTest();
@@ -1521,8 +1586,8 @@ __attribute__((constructor)) static void start(void) {
    fillColorOf = dlsym(RTLD_DEFAULT, "CGContextGetFillColorAsColor");
 
    origAppearanceNamed = swapClassMethod([NSAppearance class], @selector(appearanceNamed:), (IMP)hookAppearanceNamed);
-   origAppSetAppearance = method_setImplementation(class_getInstanceMethod([NSApplication class], @selector(setAppearance:)), (IMP)hookAppSetAppearance);
-   origCGColor = method_setImplementation(class_getInstanceMethod(NSClassFromString(@"CUINamedColor"), @selector(cgColor)), (IMP)hookCGColor);
+   origAppSetAppearance = swapInstanceMethod([NSApplication class], @selector(setAppearance:), (IMP)hookAppSetAppearance);
+   origCGColor = swapInstanceMethod(NSClassFromString(@"CUINamedColor"), @selector(cgColor), (IMP)hookCGColor);
    origCalWhite = swapClassMethod(color, @selector(colorWithCalibratedWhite:alpha:), (IMP)hookCalWhite);
    origDevWhite = swapClassMethod(color, @selector(colorWithDeviceWhite:alpha:), (IMP)hookDevWhite);
    origWhite = swapClassMethod(color, @selector(colorWithWhite:alpha:), (IMP)hookWhite);
@@ -1539,35 +1604,36 @@ __attribute__((constructor)) static void start(void) {
    swapClassMethod(color, @selector(secondaryLabelColor), (IMP)hookSecondaryLabel);
    swapClassMethod(color, @selector(tertiaryLabelColor), (IMP)hookTertiaryLabel);
    manager = objc_getClass("MAAssetManager");
-   origCompositeImage = method_setImplementation(class_getInstanceMethod(manager, NSSelectorFromString(@"CompositeImageFromDescription:withContext:")), (IMP)hookCompositeImage);
-   origCatalogImage = method_setImplementation(class_getInstanceMethod(manager, NSSelectorFromString(@"UICatalogFromDescription:withContext:")), (IMP)hookCatalogImage);
-   origImageDraw = method_setImplementation(class_getInstanceMethod([NSImage class], @selector(drawInRect:fromRect:operation:fraction:respectFlipped:hints:)), (IMP)hookImageDraw);
-   origRepDraw = method_setImplementation(class_getInstanceMethod([NSImageRep class], @selector(drawInRect:fromRect:operation:fraction:respectFlipped:hints:)), (IMP)hookRepDraw);
-   origBestRep = method_setImplementation(class_getInstanceMethod([NSImage class], @selector(bestRepresentationForRect:context:hints:)), (IMP)hookBestRep);
-   origAdjustDarkText = method_setImplementation(class_getInstanceMethod(objc_getClass("CLgNotesTextView"), NSSelectorFromString(@"adjustDarkText")), (IMP)hookAdjustDarkText);
+   origCompositeImage = swapInstanceMethod(manager, NSSelectorFromString(@"CompositeImageFromDescription:withContext:"), (IMP)hookCompositeImage);
+   origCatalogImage = swapInstanceMethod(manager, NSSelectorFromString(@"UICatalogFromDescription:withContext:"), (IMP)hookCatalogImage);
+   origImageDraw = swapInstanceMethod([NSImage class], @selector(drawInRect:fromRect:operation:fraction:respectFlipped:hints:), (IMP)hookImageDraw);
+   origRepDraw = swapInstanceMethod([NSImageRep class], @selector(drawInRect:fromRect:operation:fraction:respectFlipped:hints:), (IMP)hookRepDraw);
+   origBestRep = swapInstanceMethod([NSImage class], @selector(bestRepresentationForRect:context:hints:), (IMP)hookBestRep);
+   origAdjustDarkText = swapInstanceMethod(objc_getClass("CLgNotesTextView"), NSSelectorFromString(@"adjustDarkText"), (IMP)hookAdjustDarkText);
    notesTextView = objc_getClass("CLgNotesTextView");
-   origSetCaretColor = method_setImplementation(class_getInstanceMethod([NSTextView class], @selector(setInsertionPointColor:)), (IMP)hookSetCaretColor);
-   origSetTypingAttributes = method_setImplementation(class_getInstanceMethod([NSTextView class], @selector(setTypingAttributes:)), (IMP)hookSetTypingAttributes);
-   origFieldBackground = method_setImplementation(class_getInstanceMethod([NSTextField class], @selector(setBackgroundColor:)), (IMP)hookFieldBackground);
-   origCellBackground = method_setImplementation(class_getInstanceMethod(objc_getClass("MATextFieldCell"), NSSelectorFromString(@"setNSBackgroundColor:")), (IMP)hookCellBackground);
-   origNibDecode = method_setImplementation(class_getInstanceMethod(objc_getClass("UINibDecoder"), @selector(decodeObjectForKey:)), (IMP)hookNibDecode);
-   origAppearanceDecode = method_setImplementation(class_getInstanceMethod([NSAppearance class], @selector(initWithCoder:)), (IMP)hookAppearanceDecode);
-   origHeaderDraw = method_setImplementation(class_getInstanceMethod([NSTableHeaderView class], @selector(drawRect:)), (IMP)hookHeaderDraw);
+   origSetCaretColor = swapInstanceMethod([NSTextView class], @selector(setInsertionPointColor:), (IMP)hookSetCaretColor);
+   origSetTypingAttributes = swapInstanceMethod([NSTextView class], @selector(setTypingAttributes:), (IMP)hookSetTypingAttributes);
+   origFieldBackground = swapInstanceMethod([NSTextField class], @selector(setBackgroundColor:), (IMP)hookFieldBackground);
+   origCellBackground = swapInstanceMethod(objc_getClass("MATextFieldCell"), NSSelectorFromString(@"setNSBackgroundColor:"), (IMP)hookCellBackground);
+   origNibDecode = swapInstanceMethod(objc_getClass("UINibDecoder"), @selector(decodeObjectForKey:), (IMP)hookNibDecode);
+   origAppearanceDecode = swapInstanceMethod([NSAppearance class], @selector(initWithCoder:), (IMP)hookAppearanceDecode);
+   origHeaderDraw = swapInstanceMethod([NSTableHeaderView class], @selector(drawRect:), (IMP)hookHeaderDraw);
    toolbarOnColor = class_getInstanceVariable(objc_getClass("_TtC5Logic17ToolbarButtonCell"), "onColor");
-   origToolbarImage = method_setImplementation(class_getInstanceMethod(objc_getClass("_TtC5Logic17ToolbarButtonCell"), @selector(drawImage:withFrame:inView:)), (IMP)hookToolbarImage);
-   origButtonImage = method_setImplementation(class_getInstanceMethod([NSButtonCell class], @selector(drawImage:withFrame:inView:)), (IMP)hookButtonImage);
+   origToolbarImage = swapInstanceMethod(objc_getClass("_TtC5Logic17ToolbarButtonCell"), @selector(drawImage:withFrame:inView:), (IMP)hookToolbarImage);
+   origButtonImage = swapInstanceMethod([NSButtonCell class], @selector(drawImage:withFrame:inView:), (IMP)hookButtonImage);
    if (surfaceMax < 1 || isTinted) {
-      origOrderWindow = method_setImplementation(class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:)), (IMP)hookOrderWindow);
+      origOrderWindow = swapInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:), (IMP)hookOrderWindow);
       scaledControlBackground = [NSColor colorWithSRGBRed:surfaceMax * tint[0] green:surfaceMax * tint[1] blue:surfaceMax * tint[2] alpha:1];
-      origClipBackground = method_setImplementation(class_getInstanceMethod([NSClipView class], @selector(backgroundColor)), (IMP)hookClipBackground);
+      origClipBackground = swapInstanceMethod([NSClipView class], @selector(backgroundColor), (IMP)hookClipBackground);
       if (objc_getClass("NSToolbarPlatterView")) {
-         origPlatterLayout = method_setImplementation(class_getInstanceMethod(objc_getClass("NSToolbarPlatterView"), @selector(layout)), (IMP)hookPlatterLayout);
+         origPlatterLayout = swapInstanceMethod(objc_getClass("NSToolbarPlatterView"), @selector(layout), (IMP)hookPlatterLayout);
       }
    }
    tooltip = objc_getClass("CTooltipView");
-   origTooltipLabel = method_setImplementation(class_getInstanceMethod(tooltip, NSSelectorFromString(@"labelAttributes")), (IMP)hookTooltipLabel);
-   origTooltipValue = method_setImplementation(class_getInstanceMethod(tooltip, NSSelectorFromString(@"valueAttributes")), (IMP)hookTooltipValue);
-   origTooltipRightValue = method_setImplementation(class_getInstanceMethod(tooltip, NSSelectorFromString(@"rightAlignedValueAttributes")), (IMP)hookTooltipRightValue);
+   origTooltipLabel = swapInstanceMethod(tooltip, NSSelectorFromString(@"labelAttributes"), (IMP)hookTooltipLabel);
+   origTooltipValue = swapInstanceMethod(tooltip, NSSelectorFromString(@"valueAttributes"), (IMP)hookTooltipValue);
+   origTooltipRightValue = swapInstanceMethod(tooltip, NSSelectorFromString(@"rightAlignedValueAttributes"), (IMP)hookTooltipRightValue);
+   reportStart();
    if (getenv("LP_OUT")) {
       outDir = [NSString stringWithUTF8String:getenv("LP_OUT")];
       renderTest();
