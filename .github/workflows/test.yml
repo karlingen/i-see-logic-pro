@@ -1,0 +1,21 @@
+# Runs the theme tests and builds the launcher app for each pull request and each push to main.
+# The ruleset of main requires this check before a merge.
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Test
+        run: tests/run.sh
+      - name: Build
+        run: app/build.sh
