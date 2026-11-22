@@ -24,6 +24,7 @@ theme/launch.sh [project...]  # Starts Logic Pro with the theme, and rebuilds if
 LP_GAMMA=0.75 theme/launch.sh # Tunes the gray curve (0.5 to 1.5). A lower value is brighter
 LP_SURFACE_MAX=0.85 theme/launch.sh # Sets the lightest gray (0.65 to 1)
 LP_TINT=0.9,0.94,1 theme/launch.sh # Multiplies the mapped grays by a light color
+LP_CONTRAST=7 theme/launch.sh # Sets the contrast of secondary text (4.5 to 12). A higher value is darker
 LP_CLASSIC=1 theme/launch.sh # Keeps Logic Pro dark with the Logic Pro 12 grays
 ```
 

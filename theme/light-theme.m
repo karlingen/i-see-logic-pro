@@ -1,7 +1,7 @@
 // Light theme for Logic Pro, loaded with DYLD_INSERT_LIBRARIES. Changes nothing on disk.
-// The launcher app stores surfaceMax, gamma and tint in the SETTINGS_DOMAIN preferences.
-// The environment variables LP_SURFACE_MAX, LP_GAMMA and LP_TINT override them. A tint is
-// "r,g,b", and it multiplies the mapped grays.
+// The launcher app stores surfaceMax, gamma, contrast and tint in the SETTINGS_DOMAIN
+// preferences. The environment variables LP_SURFACE_MAX, LP_GAMMA, LP_CONTRAST and LP_TINT
+// override them. A tint is "r,g,b", and it multiplies the mapped grays.
 // LP_OUT and LP_DELAY enable the render test.
 #import <AppKit/AppKit.h>
 #import <dlfcn.h>
