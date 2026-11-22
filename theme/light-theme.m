@@ -1304,14 +1304,20 @@ static void hookPlatterLayout(NSView *platter, SEL sel) {
    ((void (*)(id, SEL))origPlatterLayout)(platter, sel);
 }
 
-/* A hook that is skipped must be counted, not passed to the runtime as null. (20.11.2026) */
 /* The build this theme was written for. Another build may work, but say so once. */
 #define TESTED_BUILD @"7801"
 
+/* A hook that is skipped must be counted, not passed to the runtime as null. (20.11.2026) */
 static int hooksInstalled;
 static int hooksSkipped;
 static char skippedNames[512];
 
+/**
+ * Counts a hook that was not installed, and adds its name to the list for reportStart.
+ *
+ * @param name const char * - the class name
+ * @param selector const char * - the selector name
+ */
 static void noteSkipped(const char *name, const char *selector) {
    size_t used = strlen(skippedNames);
 
@@ -1326,8 +1332,10 @@ static void noteSkipped(const char *name, const char *selector) {
    hooksSkipped++;
 }
 
-/* Reports what was installed and with which settings, so a broken installation is visible
-   instead of silent. With LP_DEBUG=1 it always speaks; otherwise only when a hook is missing. */
+/**
+ * Logs the installed hooks and the settings, so that a broken installation is visible. It logs
+ * when a hook is missing, or always if LP_DEBUG is set.
+ */
 static void reportStart(void) {
    if (hooksSkipped || getenv("LP_DEBUG")) {
       NSLog(@"I See Logic Pro: Logic Pro %@ build %@, %d hook%s, %d skipped, "
@@ -1342,6 +1350,14 @@ static void reportStart(void) {
    }
 }
 
+/**
+ * Replaces an instance method and counts the result. A missing class or method is skipped.
+ *
+ * @param cls Class - the class, or Nil
+ * @param sel SEL - the selector
+ * @param hook IMP - the new implementation
+ * @return IMP - the old implementation, or NULL if the hook was skipped
+ */
 static IMP swapInstanceMethod(Class cls, SEL sel, IMP hook) {
    Method method = cls ? class_getInstanceMethod(cls, sel) : NULL;
 
@@ -1353,6 +1369,14 @@ static IMP swapInstanceMethod(Class cls, SEL sel, IMP hook) {
    return method_setImplementation(method, hook);
 }
 
+/**
+ * Replaces a class method and counts the result. A missing class or method is skipped.
+ *
+ * @param cls Class - the class, or Nil
+ * @param sel SEL - the selector
+ * @param hook IMP - the new implementation
+ * @return IMP - the old implementation, or NULL if the hook was skipped
+ */
 static IMP swapClassMethod(Class cls, SEL sel, IMP hook) {
    Method method = cls ? class_getClassMethod(cls, sel) : NULL;
 

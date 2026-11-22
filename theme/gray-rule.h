@@ -12,7 +12,7 @@
 #define FOREGROUND_MIN 0.55
 // The stock gray of buttons, the darkest surface that often holds text.
 #define STOCK_TEXT_BACKGROUND 0.26
-// The contrast that text keeps on that surface at every setting.
+// The default contrast that text keeps on that surface. The launcher can set a higher one.
 #define TEXT_CONTRAST 4.5
 /* The contrast that secondary text keeps. Higher values darken the text, so the interface
    looks less washed out; 4.5 is the minimum the rule was built on. (20.11.2026) */
@@ -33,6 +33,29 @@ static inline double toSRGB(double linear) {
 }
 
 /**
+ * Returns the themed gray of a button, the darkest surface that often holds text.
+ *
+ * @param surfaceMax double - the lightest themed gray
+ * @param gamma double - the curve between the two ends
+ * @return double - the themed gray level of STOCK_TEXT_BACKGROUND
+ */
+static inline double textBackground(double surfaceMax, double gamma) {
+   return surfaceMax * pow(1 - STOCK_TEXT_BACKGROUND, gamma);
+}
+
+/**
+ * Returns the lightest text gray that keeps the given contrast on a themed button.
+ *
+ * @param surfaceMax double - the lightest themed gray
+ * @param gamma double - the curve between the two ends
+ * @param contrast double - the contrast ratio, from TEXT_CONTRAST_MIN to TEXT_CONTRAST_MAX
+ * @return double - the gray level, 0 if no gray keeps the contrast
+ */
+static inline double textLimit(double surfaceMax, double gamma, double contrast) {
+   return toSRGB(fmax(0, (toLinear(textBackground(surfaceMax, gamma)) + 0.05) / contrast - 0.05));
+}
+
+/**
  * Maps a stock gray level to the themed gray level. The darkest stock gray becomes surfaceMax,
  * and white becomes black.
  *
@@ -41,15 +64,6 @@ static inline double toSRGB(double linear) {
  * @param gamma double - the curve between the two ends
  * @return double - the themed gray level
  */
-static inline double textBackground(double surfaceMax, double gamma) {
-   return surfaceMax * pow(1 - STOCK_TEXT_BACKGROUND, gamma);
-}
-
-// The lightest text gray with the given contrast on a themed button.
-static inline double textLimit(double surfaceMax, double gamma, double contrast) {
-   return toSRGB(fmax(0, (toLinear(textBackground(surfaceMax, gamma)) + 0.05) / contrast - 0.05));
-}
-
 static inline double mapGrayLevel(double white, double surfaceMax, double gamma) {
    return surfaceMax * pow(1 - white, gamma);
 }
@@ -61,6 +75,7 @@ static inline double mapGrayLevel(double white, double surfaceMax, double gamma)
  * @param white double - the stock gray level from 0 to 1
  * @param surfaceMax double - the lightest themed gray
  * @param gamma double - the curve between the two ends
+ * @param contrast double - the contrast that secondary text keeps
  * @return double - the themed gray level
  */
 static inline double mapTextLevel(double white, double surfaceMax, double gamma, double contrast) {
@@ -69,12 +84,13 @@ static inline double mapTextLevel(double white, double surfaceMax, double gamma,
 
 /**
  * Returns the opacity of a translucent text gray. The surface shows through translucent text,
- * so the opacity rises until the text on a themed button reaches TEXT_CONTRAST, or 1.
+ * so the opacity rises until the text on a themed button reaches the contrast, or 1.
  *
  * @param white double - the stock gray level from 0 to 1
  * @param alpha double - the stock opacity from 0 to 1
  * @param surfaceMax double - the lightest themed gray
  * @param gamma double - the curve between the two ends
+ * @param contrast double - the contrast that secondary text keeps
  * @return double - the new opacity
  */
 static inline double mapTextAlpha(double white, double alpha, double surfaceMax, double gamma,

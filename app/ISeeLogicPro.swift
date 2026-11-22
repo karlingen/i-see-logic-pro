@@ -146,7 +146,13 @@ enum UpdateCheck {
       return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
    }
 
-   /// Compares "1.2.0" with "1.1.1" number by number, so that 1.10 counts as newer than 1.9.
+   /**
+    * Compares "1.2.0" with "1.1.1" number by number, so that 1.10 counts as newer than 1.9.
+    *
+    * @param candidate String - the version of a release, for example "v1.2.0"
+    * @param current String - the version of this app
+    * @return Bool - true if candidate is newer than current
+    */
    static func isNewer(_ candidate: String, than current: String) -> Bool {
       let a = numbers(in: candidate)
       let b = numbers(in: current)
@@ -162,12 +168,23 @@ enum UpdateCheck {
       return false
    }
 
+   /**
+    * Splits a version into its numbers. Text that is not a digit separates the numbers.
+    *
+    * @param text String - the version, for example "v1.2.0"
+    * @return [Int] - the numbers, for example [ 1, 2, 0 ]
+    */
    static func numbers(in text: String) -> [Int] {
       return text.split(whereSeparator: { (c) in return !c.isNumber }).map { (part) in
          return Int(part) ?? 0
       }
    }
 
+   /**
+    * Asks the GitHub API for the newest release of this repository.
+    *
+    * @return ReleaseInfo - the tag and the web page of the release
+    */
    static func latest() async throws -> ReleaseInfo {
       let address = "https://api.github.com/repos/\(repository)/releases/latest"
       var request = URLRequest(url: URL(string: address)!)
