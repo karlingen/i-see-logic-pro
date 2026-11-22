@@ -2,6 +2,19 @@
 
 This file lists the changes in each release of I See Logic Pro. The newest release is first.
 
+## Unreleased
+
+### Added
+
+- A Text contrast slider in the app. A higher value makes secondary text darker, so the light theme looks less washed out on a bright screen. The default is 4.5:1, the same contrast as before. Classic mode does not use this setting.
+- The `LP_CONTRAST` environment variable sets the text contrast for one launch with `theme/launch.sh`.
+- A Check for Updates button in the app. It asks GitHub for the newest release. If a newer release exists, a second button opens its download page. The app never replaces itself.
+- A No theme switch in the app. It starts Logic Pro as Apple ships it, without the theme.
+
+### Changed
+
+- A Logic Pro update can remove a class or a method that the theme changes. The theme then skips that change and writes its name to the system log. If the Logic Pro build is not the tested one, the theme also writes a message. Set `LP_DEBUG=1` to write a full report at each launch.
+
 ## 1.2.0 (2026-11-20)
 
 ### Added
