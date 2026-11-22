@@ -1,5 +1,9 @@
 # I See Logic Pro
 
+[![Test](https://github.com/karlingen/i-see-logic-pro/actions/workflows/test.yml/badge.svg)](https://github.com/karlingen/i-see-logic-pro/actions/workflows/test.yml)
+[![Release](https://img.shields.io/github/v/release/karlingen/i-see-logic-pro)](https://github.com/karlingen/i-see-logic-pro/releases/latest)
+[![License](https://img.shields.io/github/license/karlingen/i-see-logic-pro)](LICENSE)
+
 <img src="docs/icon.png" width="128" alt="The I See Logic Pro icon">
 
 Custom colors for Logic Pro 13. Logic Pro 13 has only one dark interface. This project gives it a light theme that you can adjust. It also has a Classic mode, which keeps Logic Pro dark with the lighter grays of Logic Pro 12. It changes the colors while Logic Pro runs.
