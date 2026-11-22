@@ -1,0 +1,55 @@
+name: Bug report
+description: A color, a crash or a launcher problem.
+labels: [ bug ]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong?
+      description: Tell us which window or control has the problem, and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Drag a screenshot here. For a color problem, a screenshot is necessary.
+  - type: input
+    id: logic-build
+    attributes:
+      label: Logic Pro version and build
+      description: In Logic Pro, choose Logic Pro > About Logic Pro. The build is the number in parentheses.
+      placeholder: 13.0 (7801)
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: '26.1'
+    validations:
+      required: true
+  - type: input
+    id: theme-version
+    attributes:
+      label: I See Logic Pro version
+      description: In the launcher, choose I See Logic Pro > About I See Logic Pro.
+      placeholder: 1.2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Light theme
+        - Classic mode
+    validations:
+      required: true
+  - type: checkboxes
+    id: edition
+    attributes:
+      label: Edition
+      options:
+        - label: I use the Logic Pro app that you buy once, not the Logic Pro of Apple Creator Studio.
+          required: true
