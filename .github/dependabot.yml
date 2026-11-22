@@ -1,0 +1,13 @@
+# Opens a pull request when a GitHub Action in .github/workflows has a newer version.
+# The project has no package manager, so the actions are the only dependencies.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: [ '*' ]
