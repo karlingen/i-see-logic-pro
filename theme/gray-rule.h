@@ -21,6 +21,10 @@
 // Translucent text grays at or above this opacity get more opacity when they need it. Lighter
 // overlays, such as hover fills, keep their opacity.
 #define TEXT_ALPHA_MIN 0.3
+// The Logic Pro build that this version was tested with. The theme logs and the launcher warns
+// for other builds, because the theme uses internal names that an update can change.
+// app/build.sh reads this line.
+#define TESTED_LOGIC_BUILD "7801"
 // The preferences domain of the launcher app, which is also its bundle identifier.
 #define SETTINGS_DOMAIN_NAME "io.github.karlingen.i-see-logic-pro"
 

@@ -19,9 +19,8 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$work/AppIcon.iconset" -o "$app/Contents/Resources/AppIcon.icns" || exit 1
 rm -r "$work"
-# The Logic Pro build that this version was tested with. The app shows a warning for
-# other builds, because the theme uses internal names that an update can change.
-tested_logic_build=7801
+# The Logic Pro build that this version was tested with. The app shows a warning for other builds.
+tested_logic_build=$(sed -n 's/^#define TESTED_LOGIC_BUILD "\(.*\)"$/\1/p' ../theme/gray-rule.h)
 # The bundle identifier is the preferences domain that the theme reads.
 domain=$(sed -n 's/^#define SETTINGS_DOMAIN_NAME "\(.*\)"$/\1/p' ../theme/gray-rule.h)
 cat > "$app/Contents/Info.plist" <<EOF

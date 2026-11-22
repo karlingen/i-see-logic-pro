@@ -1304,9 +1304,6 @@ static void hookPlatterLayout(NSView *platter, SEL sel) {
    ((void (*)(id, SEL))origPlatterLayout)(platter, sel);
 }
 
-/* The build this theme was written for. Another build may work, but say so once. */
-#define TESTED_BUILD @"7801"
-
 /* A hook that is skipped must be counted, not passed to the runtime as null. (20.11.2026) */
 static int hooksInstalled;
 static int hooksSkipped;
@@ -1574,10 +1571,10 @@ __attribute__((constructor)) static void start(void) {
    if (![NSBundle.mainBundle.bundleIdentifier isEqual:LOGIC_BUNDLE_ID]) {
       return;
    }
-   if (![NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"] isEqual:TESTED_BUILD]) {
+   if (![NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"] isEqual:@TESTED_LOGIC_BUILD]) {
       NSLog(@"I See Logic Pro: this Logic Pro build (%@) is not the tested one (%@). "
             @"Run with LP_DEBUG=1 for details, or start Logic Pro without the theme.",
-            NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"] ?: @"?", TESTED_BUILD);
+            NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"] ?: @"?", @TESTED_LOGIC_BUILD);
    }
    grayGamma = readSetting("LP_GAMMA", @"gamma", grayGamma, GAMMA_MIN, GAMMA_MAX);
    surfaceMax = readSetting("LP_SURFACE_MAX", @"surfaceMax", surfaceMax, SURFACE_MAX_MIN, 1);
