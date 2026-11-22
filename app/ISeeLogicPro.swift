@@ -200,8 +200,11 @@ enum UpdateCheck {
          throw NSError(domain: "UpdateCheck", code: 1,
                        userInfo: [NSLocalizedDescriptionKey: "Unexpected answer from GitHub."])
       }
-      return ReleaseInfo(tag: tag,
-                         page: json["html_url"] as? String ?? "https://github.com/\(repository)/releases")
+      let releases = "https://github.com/\(repository)/releases"
+      // Open only a page of this repository, whatever the answer holds.
+      let page = json["html_url"] as? String ?? ""
+
+      return ReleaseInfo(tag: tag, page: page.hasPrefix(releases + "/") ? page : releases)
    }
 }
 
