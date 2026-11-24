@@ -60,6 +60,8 @@ typedef struct { uintptr_t start; uintptr_t end; } ImageRange;
 typedef enum { STYLE_PLAIN, STYLE_SLOT, STYLE_WELL, STYLE_KNOB, STYLE_THUMB, STYLE_WHITE } ImageStyle;
 
 static ImageRange logicRanges[MAX_RANGES];
+// The Logic Pro bundle path with a slash at the end. The app can have any file name.
+static char logicBundlePrefix[PATH_MAX];
 static volatile int logicRangeCount = 0;
 // The plug-in interface frameworks, see isPlugInPath.
 static ImageRange plugInRanges[MAX_PLUG_IN_RANGES];
@@ -129,7 +131,7 @@ static void addImage(const struct mach_header *header, intptr_t slide) {
    Dl_info info;
    const struct load_command *cmd = (const void *)((const struct mach_header_64 *)header + 1);
 
-   if (!dladdr(header, &info) || !strstr(info.dli_fname, "/Logic Pro.app/") || logicRangeCount >= MAX_RANGES) {
+   if (!dladdr(header, &info) || strncmp(info.dli_fname, logicBundlePrefix, strlen(logicBundlePrefix)) != 0 || logicRangeCount >= MAX_RANGES) {
       return;
    }
    if (strstr(info.dli_fname, "/MAContentBrowserUI.framework/")) {
@@ -1608,6 +1610,7 @@ __attribute__((constructor)) static void start(void) {
    }
    singleAppearanceNames = listSingleAppearanceNames();
    trueAqua = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
+   snprintf(logicBundlePrefix, sizeof(logicBundlePrefix), "%s/", NSBundle.mainBundle.bundlePath.fileSystemRepresentation);
    _dyld_register_func_for_add_image(addImage);
    // These symbols bound the three arrange view region functions, which are adjacent in Logic.
    regionDrawStart = (uintptr_t)dlsym(RTLD_DEFAULT, "_ZNK9CRegionUI31drawRegionInArrangeViewWithFlexEv");
