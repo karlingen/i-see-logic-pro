@@ -5,7 +5,9 @@ import AppKit
 import SwiftUI
 
 let LOGIC_ID = "com.apple.logic10"
-let LOGIC_PATH = "/Applications/Logic Pro.app"
+let APPLICATIONS_PATH = "/Applications"
+// The usual path. A copy of the app can have another name, for example with a no-break space.
+let LOGIC_PATH = "\(APPLICATIONS_PATH)/Logic Pro.app"
 // The limits, the gray rule and SELECTED_ROW_WHITE come from theme/gray-rule.h.
 let SURFACE_RANGE = SURFACE_MAX_MIN...1.0
 let GAMMA_RANGE = GAMMA_MIN...GAMMA_MAX
@@ -279,6 +281,25 @@ func isLogicRunning() -> Bool {
 }
 
 /**
+ * Finds Logic Pro in the Applications folder by its bundle identifier, so that any file name works.
+ * The usual path comes first, so that a second copy with another name does not win.
+ *
+ * @return String? - the path of the Logic Pro app, or nil if the folder holds none
+ */
+func getLogicPath() -> String? {
+   let names = (try? FileManager.default.contentsOfDirectory(atPath: APPLICATIONS_PATH)) ?? []
+   let paths = [ LOGIC_PATH ] + names.filter { (name) in
+      return name.hasSuffix(".app")
+   }.map { (name) in
+      return "\(APPLICATIONS_PATH)/\(name)"
+   }
+
+   return paths.first { (path) in
+      return Bundle(path: path)?.bundleIdentifier == LOGIC_ID
+   }
+}
+
+/**
  * Finds the state of the launch from the files and the running apps.
  *
  * @param themeOff Bool - true if Logic Pro starts without the theme, which needs no library
@@ -286,7 +307,9 @@ func isLogicRunning() -> Bool {
  */
 func getLaunchStatus(themeOff: Bool) -> LaunchStatus {
    let tested = Bundle.main.infoDictionary?["TestedLogicBuild"] as? String
-   let installed = Bundle(path: LOGIC_PATH)?.infoDictionary?["CFBundleVersion"] as? String
+   let installed = getLogicPath().flatMap { (path) in
+      return Bundle(path: path)
+   }?.infoDictionary?["CFBundleVersion"] as? String
 
    if !themeOff && Bundle.main.path(forResource: "light-theme", ofType: "dylib") == nil {
       return .libraryMissing
@@ -709,7 +732,11 @@ struct ContentView: View {
    func startLogic() {
       let open = Process()
       // The Stock row starts Logic Pro the plain way, without injecting the library. (20.11.2026)
-      var arguments = [ "-n", "-a", LOGIC_PATH ]
+      guard let logicPath = getLogicPath() else {
+         status = .logicMissing
+         return
+      }
+      var arguments = [ "-n", "-a", logicPath ]
 
       if isLogicRunning() {
          status = .logicRunning
@@ -720,7 +747,7 @@ struct ContentView: View {
             status = .libraryMissing
             return
          }
-         arguments = [ "-n", "--env", "DYLD_INSERT_LIBRARIES=\(library)", "-a", LOGIC_PATH ]
+         arguments = [ "-n", "--env", "DYLD_INSERT_LIBRARIES=\(library)", "-a", logicPath ]
       }
       open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
       open.arguments = arguments
