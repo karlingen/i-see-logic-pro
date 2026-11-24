@@ -17,7 +17,7 @@ This project is a prototype. It is not from Apple, and Apple does not support it
 ## Requirements
 
 - Logic Pro 13.0 (build 7801). Other versions are not tested.
-- The Logic Pro app that you buy once. The theme does not work with the Logic Pro of Apple Creator Studio.
+- The Logic Pro app that you buy once. The theme does not work with the Logic Pro of Apple Creator Studio. Apple protects that edition, so it cannot load other libraries.
 - A Mac with Apple silicon. The library is built for arm64 only.
 - macOS 26. Other versions are not tested.
 
