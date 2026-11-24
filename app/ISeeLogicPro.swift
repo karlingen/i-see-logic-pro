@@ -33,6 +33,9 @@ let SWATCH_RING = 3.0
 // The swatches show each tint this many times stronger than the theme, so that the hues are
 // easy to tell apart. The preview shows the true strength.
 let SWATCH_GAIN = 3.0
+// The seconds that the app counts down before it starts Logic Pro by itself. The user can
+// cancel in this time to change the settings.
+let AUTO_START_SECONDS = 2
 
 // Stock Logic Pro grays of the track area, measured in a render of Logic Pro without the theme.
 let STOCK_ROW = 0.18
@@ -261,6 +264,14 @@ enum LaunchStatus {
       }
    }
 
+   /// True only when nothing needs the attention of the user, so the app can start Logic Pro by itself.
+   var isReady: Bool {
+      switch self {
+      case .ready, .readyPlain: return true
+      default: return false
+      }
+   }
+
    var canStart: Bool {
       switch self {
       case .ready, .readyPlain, .logicUntested, .failed: return true
@@ -480,7 +491,11 @@ struct ContentView: View {
    @AppStorage("classic") var isClassic = false
    /// True when the Stock row is selected: Logic Pro starts without the theme, as Apple ships it.
    @AppStorage("themeOff") var themeOff = false
+   /// True when the app starts Logic Pro by itself after a countdown each time that it opens.
+   @AppStorage("autoStart") var isAutoStart = false
    @State var status = LaunchStatus.ready
+   /// The seconds left before the app starts Logic Pro, or nil when no countdown runs.
+   @State var countdown: Int?
    @State var columns = NavigationSplitViewVisibility.all
    /// The answer of the update check, shown under the status line.
    @State var updateText = ""
@@ -596,14 +611,40 @@ struct ContentView: View {
                .controlSize(.regular)
                .disabled(updateText == "Checking ...")
                Spacer()
+               Toggle("Start Logic Pro automatically", isOn: $isAutoStart)
+                  .help("Each time that this app opens, it counts down \(AUTO_START_SECONDS) seconds "
+                     + "and starts Logic Pro. Click Cancel to change the settings first.")
             }
          }
          .padding(20)
          .navigationTitle("I See Logic Pro")
       }
+      // The countdown screen blocks only the mouse, so the keyboard and VoiceOver must not reach
+      // the settings under it. Return would start Logic Pro and the arrow keys would change the preset.
+      .disabled(countdown != nil)
+      .accessibilityHidden(countdown != nil)
       .frame(width: WINDOW_SIZE.width, height: WINDOW_SIZE.height)
+      .overlay {
+         if let countdown {
+            countdownView(seconds: countdown)
+         }
+      }
+      .task(id: countdown) {
+         await tickCountdown()
+      }
+      // A warning that comes during the countdown, for example a start of Logic Pro from the
+      // Dock, stops the countdown so that the status line shows it.
+      .onChange(of: status.isReady) {
+         if !status.isReady {
+            countdown = nil
+         }
+      }
       .onAppear {
          status = getLaunchStatus(themeOff: themeOff)
+         // A warning in the status line must stay visible, so only a clean state starts the countdown.
+         if isAutoStart && status.isReady {
+            countdown = AUTO_START_SECONDS
+         }
       }
       .onChange(of: themeOff) {
          status = getLaunchStatus(themeOff: themeOff)
@@ -732,6 +773,62 @@ struct ContentView: View {
       .help(t.name)
       .accessibilityLabel(t.name)
       .accessibilityAddTraits(isSelected ? .isSelected : [])
+   }
+
+   /**
+    * Draws the screen that covers the window during the countdown. Cancel removes it and shows
+    * the settings.
+    *
+    * @param seconds Int - the seconds left before Logic Pro starts
+    * @return some View - the countdown screen
+    */
+   func countdownView(seconds: Int) -> some View {
+      var look = "Theme: \(selection.wrappedValue ?? CUSTOM)"
+
+      if themeOff {
+         look = "Without the theme"
+      } else if !isClassic && tint.stored != NO_TINT.stored {
+         // Classic does not use the tint, so only the light theme names it.
+         look += ", tint \(tint.name)"
+      }
+      return VStack(spacing: 12) {
+         Text("Starting Logic Pro in").font(.title2)
+         Text("\(seconds)").font(.largeTitle).monospacedDigit()
+         Text(look).foregroundStyle(.secondary)
+         Button("Cancel") {
+            countdown = nil
+         }
+         .keyboardShortcut(.cancelAction)
+         .controlSize(.large)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(.regularMaterial)
+   }
+
+   /**
+    * Waits one second, then counts down by one. At zero it starts Logic Pro. A cancel sets the
+    * countdown to nil, and that change cancels this task during its wait.
+    */
+   func tickCountdown() async {
+      guard let seconds = countdown else {
+         return
+      }
+      do {
+         try await Task.sleep(for: .seconds(1))
+      } catch {
+         return
+      }
+      // SwiftUI cancels this task only at its next view update. If the wait ends between a
+      // cancel and that update, the countdown is already nil, so this task must stop here.
+      if Task.isCancelled || countdown != seconds {
+         return
+      }
+      if seconds > 1 {
+         countdown = seconds - 1
+         return
+      }
+      countdown = nil
+      startLogic()
    }
 
    func percent(_ value: Double) -> String {

@@ -2,6 +2,12 @@
 
 This file lists the changes in each release of I See Logic Pro. The newest release is first.
 
+## Unreleased
+
+### Added
+
+- A Start Logic Pro automatically checkbox in the app. If you select it, the app counts down 2 seconds each time that you open it. Then it starts Logic Pro with your last settings. Click Cancel or press Esc to stop the countdown and change the settings. If the status line shows a warning, the app does not count down.
+
 ## 1.3.0 (2026-11-24)
 
 ### Added

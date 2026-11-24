@@ -68,6 +68,8 @@ The build writes `theme/light-theme.dylib` and copies it into `app/I See Logic P
 
 The app starts Logic Pro with the theme, and then it quits. The theme loads only at launch, so a change takes effect the next time that you start Logic Pro.
 
+If you select Start Logic Pro automatically, the app counts down 2 seconds each time that you open it. Then it starts Logic Pro with your last settings. To change the settings first, click Cancel or press Esc. If the status line shows a warning, the app does not count down.
+
 The first launch with the theme takes about one second longer. The theme then reads the color names from your copy of Logic Pro and keeps them in a cache. The next launches use the cache.
 
 ![The launcher app with the Soft preset and the Cool tint](docs/launcher.png)
