@@ -1,10 +1,10 @@
 # Fails a pull request whose title does not follow Conventional Commits, for example
 # "fix: Keep the track name readable". A squash merge uses the title as the commit subject.
-# The job does not check out the code of the pull request, so pull_request_target is safe here.
+# The pull_request event gives the job a read-only token, which is enough to read the title.
 name: PR title
 
 on:
-  pull_request_target:
+  pull_request:
     types: [ opened, edited, reopened, synchronize ]
 
 permissions:
