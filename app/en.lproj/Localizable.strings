@@ -1,0 +1,3 @@
+/* English is the development language and the key of every text, so this file is empty on
+   purpose. It exists so that macOS has an English candidate: without it, German would win
+   for a user whose system languages are, for example, English and then German. */

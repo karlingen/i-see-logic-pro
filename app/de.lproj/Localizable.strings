@@ -1,0 +1,74 @@
+/* German translation of the app. The English text is the key, so SwiftUI literals and the
+   strings that the code passes to localized() both find their translation here. */
+
+/* Buttons and switches */
+"Start Logic Pro" = "Logic Pro starten";
+"Check for Updates" = "Nach Updates suchen";
+"Start Logic Pro automatically" = "Logic Pro automatisch starten";
+"Cancel" = "Abbrechen";
+"Get %@" = "%@ herunterladen";
+
+/* Labels */
+"Tint" = "Farbton";
+"Lightness" = "Helligkeit";
+"Text contrast" = "Textkontrast";
+"Middle grays" = "Mittlere Grautöne";
+"Dark" = "Dunkel";
+"Light" = "Hell";
+"Soft" = "Weich";
+"Crisp" = "Kräftig";
+"Starting Logic Pro in" = "Logic Pro startet in";
+
+/* Help text of the auto start switch */
+"Each time that this app opens, it counts down %ld seconds and starts Logic Pro. Click Cancel to change the settings first." = "Bei jedem Öffnen dieser App werden %ld Sekunden heruntergezählt, dann startet Logic Pro. Mit „Abbrechen“ ändern Sie vorher die Einstellungen.";
+
+/* Summaries of the rows in the sidebar */
+"Full brightness" = "Volle Helligkeit";
+"Dimmer grays" = "Gedämpft";
+"Middle gray" = "Mittleres Grau";
+"Your own values" = "Eigene Werte";
+"LP 12 grays" = "Grau wie LP 12";
+"Apple default" = "So wie von Apple";
+
+/* Status line */
+"Ready. Logic Pro starts with the theme." = "Bereit. Logic Pro startet mit dem Design.";
+"Ready. Logic Pro starts without the theme." = "Bereit. Logic Pro startet ohne das Design.";
+"Quit Logic Pro first. The theme loads only at launch." = "Logic Pro zuerst beenden. Das Design wird nur beim Start geladen.";
+"Logic Pro is not in the Applications folder." = "Logic Pro liegt nicht im Ordner „Programme“.";
+"The theme library is missing. Download the app again." = "Die Bibliothek des Designs fehlt. Laden Sie die App erneut herunter.";
+"Tested with Logic Pro build %@, but you have build %@. Some parts can stay dark." = "Geprüft mit Logic-Pro-Build %@, Sie haben Build %@. Einzelne Teile können dunkel bleiben.";
+"Logic Pro did not start. %@" = "Logic Pro ist nicht gestartet. %@";
+"The open command ended with code %d." = "Der Aufruf zum Öffnen endete mit Code %d.";
+
+/* Update check */
+"Checking ..." = "Wird geprüft …";
+"Up to date (%@)" = "Auf dem neuesten Stand (%@)";
+"Local build, newest is %@" = "Eigener Build, neueste Fassung ist %@";
+"No answer from GitHub" = "Keine Antwort von GitHub";
+
+/* Countdown */
+"Theme: %@" = "Design: %@";
+", tint %@" = ", Farbton %@";
+"Without the theme" = "Ohne das Design";
+
+/* Preview description for VoiceOver */
+"Preview of Logic Pro tracks without the theme" = "Vorschau der Logic-Pro-Spuren ohne das Design";
+"Preview of Logic Pro tracks with the Logic Pro 12 grays" = "Vorschau der Logic-Pro-Spuren mit den Grautönen von Logic Pro 12";
+"Preview of Logic Pro tracks at %@ lightness, tint %@" = "Vorschau der Logic-Pro-Spuren bei %@ Helligkeit, Farbton %@";
+
+/* Names of the presets and the tints. The English name is the stored value, so the
+   translation is only the label. */
+"preset.Light" = "Hell";
+"preset.Soft" = "Sanft";
+"preset.Gray" = "Grau";
+"preset.Custom" = "Eigene";
+"preset.Classic" = "Klassisch";
+"preset.Stock" = "Original";
+
+"tint.None" = "Ohne";
+"tint.Cool" = "Kühl";
+"tint.Mist" = "Nebel";
+"tint.Sage" = "Salbei";
+"tint.Sand" = "Sand";
+"tint.Rose" = "Rosé";
+"tint.Lilac" = "Flieder";

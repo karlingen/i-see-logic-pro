@@ -9,6 +9,12 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 swiftc -parse-as-library -O -target arm64-apple-macos14 -import-objc-header ../theme/gray-rule.h \
    -o "$app/Contents/MacOS/ISeeLogicPro" ISeeLogicPro.swift || exit 1
 cp ../theme/light-theme.dylib "$app/Contents/Resources/"
+# The strings files of each language, so that macOS shows the app in the user's language.
+for table in *.lproj; do
+   if [ -d "$table" ]; then
+      cp -R "$table" "$app/Contents/Resources/"
+   fi
+done
 # Draws the icon at 1024 points and scales it to each icon size.
 work=$(mktemp -d) || exit 1
 swiftc -O -o "$work/app-icon" AppIcon.swift && "$work/app-icon" "$work/icon.png" || exit 1
@@ -33,6 +39,7 @@ cat > "$app/Contents/Info.plist" <<EOF
    <key>CFBundleIdentifier</key><string>$domain</string>
    <key>CFBundleName</key><string>I See Logic Pro</string>
    <key>CFBundlePackageType</key><string>APPL</string>
+   <key>CFBundleDevelopmentRegion</key><string>en</string>
    <key>CFBundleShortVersionString</key><string>${VERSION:-dev}</string>
    <key>LSMinimumSystemVersion</key><string>14.0</string>
    <key>TestedLogicBuild</key><string>$tested_logic_build</string>

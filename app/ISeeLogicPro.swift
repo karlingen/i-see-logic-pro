@@ -27,7 +27,10 @@ let RULER_HEIGHT = 20.0
 let BAR_WIDTH = 46.0
 let BAR_COUNT = 12
 let STRIP_FOOTER = 14.0
-let END_LABEL_WIDTH = 30.0
+// The end labels of the sliders sit in frames of this width. The longest English label is
+// "Crisp" at 25 points, the longest German one is "Dunkel" at 33 points (measured in the
+// caption font), so 36 points fits both and keeps the sliders aligned from row to row.
+let END_LABEL_WIDTH = 36.0
 let SWATCH_SIZE = 18.0
 let SWATCH_RING = 3.0
 // The swatches show each tint this many times stronger than the theme, so that the hues are
@@ -75,6 +78,37 @@ struct Tint: Identifiable {
    // The format that the theme reads, "r,g,b".
    var stored: String { return "\(red),\(green),\(blue)" }
 }
+
+/**
+ * Returns the translation of an English text, or the text itself when no translation exists.
+ *
+ * The English text is the key, so the strings file needs no invented identifiers. SwiftUI
+ * localizes its own literals. This function serves the texts that are built in code.
+ *
+ * @param text String - the English text, which is also the key in Localizable.strings
+ * @return String - the translated text
+ */
+func localized(_ text: String) -> String {
+   return NSLocalizedString(text, comment: "")
+}
+
+/**
+ * Returns the translated label of a stored name, or the name itself when the language has
+ * no translation. The keys of presets and tints carry a prefix, so the name goes in as the
+ * value: NSLocalizedString returns the value when the key is missing.
+ *
+ * @param prefix String - the prefix that marks the kind of name
+ * @param name String - the English name, which is also the stored value
+ * @return String - the translated label or the English name
+ */
+func localizedName(_ prefix: String, _ name: String) -> String {
+   return NSLocalizedString(prefix + name, value: name, comment: "")
+}
+
+// Preset names and tint names are stored values, so they stay English. Only the label
+// is translated, and a prefix keeps these keys apart from the labels of the sliders.
+let PRESET_KEY_PREFIX = "preset."
+let TINT_KEY_PREFIX = "tint."
 
 let NO_TINT = Tint(name: "None", red: 1, green: 1, blue: 1)
 let TINTS = [
@@ -237,14 +271,16 @@ enum LaunchStatus {
 
    var text: String {
       switch self {
-      case .ready: return "Ready. Logic Pro starts with the theme."
-      case .readyPlain: return "Ready. Logic Pro starts without the theme."
-      case .logicRunning: return "Quit Logic Pro first. The theme loads only at launch."
-      case .logicMissing: return "Logic Pro is not in the Applications folder."
-      case .libraryMissing: return "The theme library is missing. Download the app again."
+      case .ready: return localized("Ready. Logic Pro starts with the theme.")
+      case .readyPlain: return localized("Ready. Logic Pro starts without the theme.")
+      case .logicRunning: return localized("Quit Logic Pro first. The theme loads only at launch.")
+      case .logicMissing: return localized("Logic Pro is not in the Applications folder.")
+      case .libraryMissing: return localized("The theme library is missing. Download the app again.")
       case .logicUntested(let tested, let installed):
-         return "Tested with Logic Pro build \(tested), but you have build \(installed). Some parts can stay dark."
-      case .failed(let error): return "Logic Pro did not start. \(error)"
+         return String(format: localized("Tested with Logic Pro build %@, but you have build %@. Some parts can stay dark."),
+            tested, installed)
+      case .failed(let error):
+         return String(format: localized("Logic Pro did not start. %@"), error)
       }
    }
 
@@ -499,6 +535,7 @@ struct ContentView: View {
    @State var columns = NavigationSplitViewVisibility.all
    /// The answer of the update check, shown under the status line.
    @State var updateText = ""
+   @State var isChecking = false
    /// Where the newest release can be downloaded, once one was found.
    @State var updatePage: String?
 
@@ -521,12 +558,13 @@ struct ContentView: View {
 
    var previewLabel: String {
       if themeOff {
-         return "Preview of Logic Pro tracks without the theme"
+         return localized("Preview of Logic Pro tracks without the theme")
       }
       if isClassic {
-         return "Preview of Logic Pro tracks with the Logic Pro 12 grays"
+         return localized("Preview of Logic Pro tracks with the Logic Pro 12 grays")
       }
-      return "Preview of Logic Pro tracks at \(percent(surfaceMax)) lightness, tint \(tint.name)"
+      return String(format: localized("Preview of Logic Pro tracks at %@ lightness, tint %@"),
+         percent(surfaceMax), localizedName(TINT_KEY_PREFIX, tint.name))
    }
 
    var selection: Binding<String?> {
@@ -569,11 +607,14 @@ struct ContentView: View {
                .accessibilityElement(children: .ignore)
                .accessibilityLabel(previewLabel)
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 12) {
-               sliderRow("Lightness", value: $surfaceMax, range: SURFACE_RANGE, low: "Dark", high: "Light",
+               sliderRow(localized("Lightness"), value: $surfaceMax, range: SURFACE_RANGE,
+                  low: localized("Dark"), high: localized("Light"),
                   shown: percent(surfaceMax))
-               sliderRow("Text contrast", value: $contrast, range: CONTRAST_RANGE, low: "Soft", high: "Crisp",
+               sliderRow(localized("Text contrast"), value: $contrast, range: CONTRAST_RANGE,
+                  low: localized("Soft"), high: localized("Crisp"),
                   shown: String(format: "%.1f:1", contrast), step: 0.1)
-               sliderRow("Middle grays", value: $gamma, range: GAMMA_RANGE, low: "Light", high: "Dark",
+               sliderRow(localized("Middle grays"), value: $gamma, range: GAMMA_RANGE,
+                  low: localized("Light"), high: localized("Dark"),
                   shown: String(format: "%.2f", gamma))
                tintRow
             }
@@ -609,11 +650,11 @@ struct ContentView: View {
                   checkForUpdates()
                }
                .controlSize(.regular)
-               .disabled(updateText == "Checking ...")
+               .disabled(isChecking)
                Spacer()
                Toggle("Start Logic Pro automatically", isOn: $isAutoStart)
-                  .help("Each time that this app opens, it counts down \(AUTO_START_SECONDS) seconds "
-                     + "and starts Logic Pro. Click Cancel to change the settings first.")
+                  .help(String(format: localized("Each time that this app opens, it counts down %ld seconds "
+                     + "and starts Logic Pro. Click Cancel to change the settings first."), AUTO_START_SECONDS))
             }
          }
          .padding(20)
@@ -664,7 +705,8 @@ struct ContentView: View {
     */
    @MainActor func checkForUpdates() {
       updatePage = nil
-      updateText = "Checking ..."
+      updateText = localized("Checking ...")
+      isChecking = true
       Task {
          do {
             let release = try await UpdateCheck.latest()
@@ -672,17 +714,18 @@ struct ContentView: View {
 
             if current == "dev" || !UpdateCheck.isNewer(release.tag, than: current) {
                updateText = current == "dev"
-                  ? "Local build, newest is \(release.tag)"
-                  : "Up to date (\(release.tag))"
+                  ? String(format: localized("Local build, newest is %@"), release.tag)
+                  : String(format: localized("Up to date (%@)"), release.tag)
                updatePage = nil
             } else {
                updateText = release.tag
                updatePage = release.page
             }
          } catch {
-            updateText = "No answer from GitHub"
+            updateText = localized("No answer from GitHub")
             updatePage = nil
          }
+         isChecking = false
       }
    }
 
@@ -701,8 +744,8 @@ struct ContentView: View {
             .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(.separator))
             .frame(width: 18, height: 18)
          VStack(alignment: .leading, spacing: 1) {
-            Text(name)
-            Text(summary).font(.caption).foregroundStyle(.secondary)
+            Text(localizedName(PRESET_KEY_PREFIX, name))
+            Text(localized(summary)).font(.caption).foregroundStyle(.secondary)
          }
       }
       .padding(.vertical, 3)
@@ -740,7 +783,8 @@ struct ContentView: View {
          }
          .accessibilityElement(children: .contain)
          .accessibilityLabel("Tint")
-         Text(tint.name).foregroundStyle(.secondary).frame(width: 40, alignment: .trailing)
+         Text(localizedName(TINT_KEY_PREFIX, tint.name)).foregroundStyle(.secondary)
+            .frame(minWidth: 40, alignment: .trailing)
       }
    }
 
@@ -770,8 +814,8 @@ struct ContentView: View {
          .contentShape(Circle())
       }
       .buttonStyle(.plain)
-      .help(t.name)
-      .accessibilityLabel(t.name)
+      .help(localizedName(TINT_KEY_PREFIX, t.name))
+      .accessibilityLabel(localizedName(TINT_KEY_PREFIX, t.name))
       .accessibilityAddTraits(isSelected ? .isSelected : [])
    }
 
@@ -783,13 +827,14 @@ struct ContentView: View {
     * @return some View - the countdown screen
     */
    func countdownView(seconds: Int) -> some View {
-      var look = "Theme: \(selection.wrappedValue ?? CUSTOM)"
+      let name = selection.wrappedValue ?? CUSTOM
+      var look = String(format: localized("Theme: %@"), localizedName(PRESET_KEY_PREFIX, name))
 
       if themeOff {
-         look = "Without the theme"
+         look = localized("Without the theme")
       } else if !isClassic && tint.stored != NO_TINT.stored {
          // Classic does not use the tint, so only the light theme names it.
-         look += ", tint \(tint.name)"
+         look += String(format: localized(", tint %@"), localizedName(TINT_KEY_PREFIX, tint.name))
       }
       return VStack(spacing: 12) {
          Text("Starting Logic Pro in").font(.title2)
@@ -869,7 +914,8 @@ struct ContentView: View {
          return
       }
       if open.terminationStatus != 0 {
-         status = .failed("The open command ended with code \(open.terminationStatus).")
+         let code = open.terminationStatus
+         status = .failed(String(format: localized("The open command ended with code %d."), code))
          return
       }
       NSApp.terminate(nil)
