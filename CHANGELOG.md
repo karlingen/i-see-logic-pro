@@ -4,6 +4,10 @@ This file lists the changes in each release of I See Logic Pro. The newest relea
 
 ## Unreleased
 
+### Added
+
+- You can install the app with Homebrew: `brew install --cask karlingen/tap/i-see-logic-pro`. Homebrew removes the download flag, so macOS opens the app with no warning.
+
 ### Fixed
 
 - In Classic mode, the title bar and the control bar at the top of the window are gray, not black.

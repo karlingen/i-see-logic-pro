@@ -23,6 +23,18 @@ This project is a prototype. It is not from Apple, and Apple does not support it
 
 ## Install
 
+### With Homebrew
+
+If you use [Homebrew](https://brew.sh), run this command:
+
+```sh
+brew install --cask karlingen/tap/i-see-logic-pro
+```
+
+Homebrew puts the app in your Applications folder. It also removes the download flag, so macOS opens the app with no warning. To get a new version, run `brew upgrade --cask i-see-logic-pro`. Do not use the download button of Check for Updates in the app. A manual download replaces the app that Homebrew manages, and Homebrew then shows the wrong version.
+
+### From the Releases page
+
 1. Download the zip file of the latest version from the [Releases page](https://github.com/karlingen/i-see-logic-pro/releases/latest).
 2. Open the zip file. Finder unpacks `I See Logic Pro.app`.
 3. Move `I See Logic Pro.app` to your Applications folder.
@@ -165,6 +177,24 @@ The theme reads the color names of the new Logic Pro version at the first launch
 An update can also change the internal functions that the theme uses. Each version of the app was tested with one build of Logic Pro. If your build is different, the status line of the app tells you, and some parts of the interface can stay dark. Look for a newer version on the Releases page. If there is none, open an issue with your Logic Pro version.
 
 ## Remove
+
+If you installed the app with Homebrew, do these steps:
+
+1. Delete the app, the stored settings and the color cache:
+
+   ```sh
+   brew uninstall --cask --zap i-see-logic-pro
+   ```
+
+2. macOS can keep the old settings in memory and write them back. Delete them there too:
+
+   ```sh
+   defaults delete io.github.karlingen.i-see-logic-pro
+   ```
+
+3. Start Logic Pro from the Dock as usual.
+
+If you did not use Homebrew, do these steps:
 
 1. Delete `I See Logic Pro.app`. If you built it from source, delete the repository folder too.
 2. Delete the stored settings and the color cache:
