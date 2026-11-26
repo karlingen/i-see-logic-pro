@@ -1272,13 +1272,15 @@ static void hookButtonImage(NSButtonCell *cell, SEL sel, NSImage *image, NSRect 
    ((void (*)(id, SEL, NSImage *, NSRect, NSView *))origButtonImage)(cell, sel, isActive ? whiteGlyph(image) : image, frame, view);
 }
 
-// The macOS 26 title bar is glass, which is white in Aqua. A transparent title bar shows the
-// window background. The main window uses the mapped BackgroundViewControlbar color, but the
-// editor windows use the system windowBackgroundColor, which the theme does not map.
+// The macOS 26 title bar is glass, which is white in Aqua and near black in DarkAqua. A
+// transparent title bar shows the window background. The main window uses the mapped
+// BackgroundViewControlbar color. The editor windows use the system windowBackgroundColor,
+// which the light theme does not map, so they get BackgroundViewControlbar too. Classic mode
+// keeps the dark system gray, so it does not change the window background.
 static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode place, NSInteger other) {
    if (place != NSWindowOut && (window.styleMask & NSWindowStyleMaskTitled) && !window.titlebarAppearsTransparent) {
       window.titlebarAppearsTransparent = YES;
-      if ([window.backgroundColor isEqual:NSColor.windowBackgroundColor]) {
+      if (!isClassic && [window.backgroundColor isEqual:NSColor.windowBackgroundColor]) {
          window.backgroundColor = [NSColor colorNamed:@"BackgroundViewControlbar"];
       }
    }
@@ -1601,6 +1603,8 @@ __attribute__((constructor)) static void start(void) {
    isClassic = readSetting("LP_CLASSIC", @"classic", 0, 0, 1) >= 0.5;
    if (isClassic) {
       origCGColor = swapInstanceMethod(NSClassFromString(@"CUINamedColor"), @selector(cgColor), (IMP)hookCGColor);
+      // The dark glass title bar is near black. A transparent title bar shows the classic gray.
+      origOrderWindow = swapInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:), (IMP)hookOrderWindow);
       reportStart();
       if (getenv("LP_OUT")) {
          outDir = [NSString stringWithUTF8String:getenv("LP_OUT")];
