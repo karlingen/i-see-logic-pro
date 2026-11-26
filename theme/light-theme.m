@@ -399,6 +399,8 @@ static CGColorRef copyClassicColor(CGColorRef color, NSString *name) {
          @"GlobalTracksBackground": @"Colors/RulerColor",
          @"BackgroundViewControlbar": @"Colors/PanelHeaderColor",
          @"BackgroundLocalMenubar": @"Colors/PanelHeaderColor",
+         // The only black that classic mode changes. The control bar line and the pane dividers use it.
+         @"DividerDarkStrong": @"Colors/MainWindow/BackgroundBottomLineGray",
          @"ChannelstripBackground": @"Colors/TrackHeader/Background",
          @"ChannelstripBackgroundSelected": @"Colors/TrackHeader/SelectedBackground",
       };

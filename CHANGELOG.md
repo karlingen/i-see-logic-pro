@@ -7,6 +7,7 @@ This file lists the changes in each release of I See Logic Pro. The newest relea
 ### Fixed
 
 - In Classic mode, the title bar and the control bar at the top of the window are gray, not black.
+- In Classic mode, the line below the control bar and the lines between the panes are dark gray, not black.
 
 ## 1.4.0 (2026-11-25)
 
